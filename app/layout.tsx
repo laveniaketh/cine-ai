@@ -6,18 +6,18 @@ import LightRays from "@/components/LightRays";
 
 
 const figtree = Figtree({
-    variable: "--font-figtree",
-    subsets: ["latin"],
+  variable: "--font-figtree",
+  subsets: ["latin"],
 });
 
 const schibstedGrotesk = Schibsted_Grotesk({
-    variable: "--font-schibsted-grotesk",
-    subsets: ["latin"],
+  variable: "--font-schibsted-grotesk",
+  subsets: ["latin"],
 });
 
 const martianMono = Martian_Mono({
-    variable: "--font-martian-mono",
-    subsets: ["latin"],
+  variable: "--font-martian-mono",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -33,27 +33,29 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-          className={`${schibstedGrotesk.variable} ${martianMono.variable} ${figtree.variable} min-h-screen antialiased`}
+        className={`${schibstedGrotesk.variable} ${martianMono.variable} ${figtree.variable} min-h-screen antialiased`}
       >
-      <div className="absolute inset-0 top-0 z-[-1] min-h-screen">
+        <div className="pattern" />
+        <div className="absolute inset-0 top-0 z-[-1] min-h-screen">
           <LightRays
-              raysOrigin="top-center"
-              raysColor="#FFFF"
-              raysSpeed={1}
-              lightSpread={1.2}
-              rayLength={1}
-              followMouse={true}
-              mouseInfluence={0.02}
-              noiseAmount={0.2}
-              fadeDistance={1.5}
+            raysOrigin="top-center"
+            raysColor="#FFFF"
+            raysSpeed={0.1}
+            lightSpread={0.5}
+            rayLength={1}
+            followMouse={true}
+            mouseInfluence={0.02}
+            noiseAmount={0.1}
+            fadeDistance={1}
           />
 
-      </div>
-      <main className="relative flex flex-col min-h-screen ">
+
+        </div>
+
+        <main className="relative flex flex-col min-h-screen ">
           {children}
 
-      </main>
-
+        </main>
 
       </body>
     </html>
