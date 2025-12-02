@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
-import CurvedLoop from "@/components/CurvedLoop"
+import CircularText from "@/components/CircularText"
 
 const AdminLogin = () => {
     return (
@@ -30,29 +30,39 @@ const AdminLogin = () => {
             </div>
 
 
-            <div className="flex w-full items-center  bg-[#1b1a16] rounded-lg shadow-md shadow-gray-700 border-none ">
-                {/* <div
+            <div className="relative flex w-250 h-100 items-center justify-center bg-[#1b1a16] rounded-lg shadow-md shadow-gray-700 border-none ">
 
-                >
-                    <Image src="/popcorn-box (1).png" alt="Admin Icon" width={700} height={700} />
-                </div> */}
-                <div className="">
-                    <CurvedLoop
-                        marqueeText="FILM DEVELOPMENT COUNCIL OF THE PHILIPPINES"
-                        speed={3}
-                        curveAmount={500}
-                        direction="right"
-                        interactive={true}
-
-
-                    />
+                {/* POPCORN Circulartext DESIGN */}
+                <div className="absolute -bottom-12 -left-12 transform -rotate-6 pointer-events-none z-0 bg-contain ">
+                    <div className="relative w-[320px] h-80">
+                        <CircularText
+                            text="REACT*BITS*COMPONENTS*"
+                            onHover="slowDown"
+                            spinDuration={20}
+                            className=""
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center z-10">
+                            <Image src="/popcorn-box (1).png" alt="Admin Icon" width={200} height={200} className="-rotate-6" />
+                        </div>
+                    </div>
                 </div>
 
 
-                <Card className="  text-white relative overflow-hidden w-full max-w-sm  bg-[#1b1a16] border-none ">
+
+
+
+                {/* LOGIN FORM */}
+                <Card className="text-white relative overflow-hidden w-sm bg-[#1b1a16] border-none  justify-end-safe">
 
                     <CardHeader className="text-center">
-                        <CardTitle className="text-xl">CineAi Management System</CardTitle>
+
+
+
+                        <CardTitle className="text-xl mt-4">
+                            CineAi Management System
+
+
+                        </CardTitle>
                         <CardDescription>
                             Login to your account
                         </CardDescription>
@@ -63,6 +73,8 @@ const AdminLogin = () => {
                         >
                             <Image src="/popcorn-box (1).png" alt="Admin Icon" width={380} height={380} />
                         </div> */}
+
+
 
                         <div className="relative z-10">
                             <FieldSet>
