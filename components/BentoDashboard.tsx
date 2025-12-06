@@ -315,7 +315,7 @@ const SkeletonOne = () => {
                 className="h-full w-1/3 rounded-2xl bg-white dark:bg-black dark:border-white/[0.1] border border-neutral-200 relative overflow-hidden"
             >
                 <Image
-                    src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800&auto=format&fit=crop"
+                    src="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=800&auto=format&fit=crop"
                     alt="Movie 2"
                     fill
                     className="object-cover"
@@ -331,7 +331,7 @@ const SkeletonOne = () => {
             </motion.div>
             <motion.div className="h-full relative z-20 w-1/3 rounded-2xl bg-white dark:bg-black dark:border-white/[0.1] border border-neutral-200 relative overflow-hidden">
                 <Image
-                    src="https://images.unsplash.com/photo-1489599811423-99b8cd36dd98?q=80&w=800&auto=format&fit=crop"
+                    src="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=800&auto=format&fit=crop"
                     alt="Movie 1"
                     fill
                     className="object-cover"
@@ -607,10 +607,10 @@ const SkeletonFour = () => {
     );
 };
 
-const Skeleton = () => (
-    //display p[]
-    <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl   dark:bg-dot-white/[0.2] bg-dot-black/[0.2]  bg-neutral-100 dark:bg-neutral-800"></div>
-);
+// const Skeleton = () => (
+//     //display p[]
+//     <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl   dark:bg-dot-white/[0.2] bg-dot-black/[0.2]  bg-neutral-100 dark:bg-neutral-800"></div>
+// );
 
 const items = [
     {

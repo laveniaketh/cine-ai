@@ -214,9 +214,9 @@
   ul {
     @apply list-none;
   }
-  p {
-    @apply font-schibsted-grotesk;
-  }
+  /* p {
+    @apply font-figtree;
+  } */
 }
 
 @layer components {
