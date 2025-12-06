@@ -33,26 +33,40 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${schibstedGrotesk.variable} ${martianMono.variable} ${figtree.variable} min-h-screen antialiased`}
+        className={`${schibstedGrotesk.variable} ${martianMono.variable} ${figtree.variable} min-h-screen  antialiased`}
       >
-        <div className="pattern" />
-        <div className="absolute inset-0 top-0 z-[-1] min-h-screen">
+        {/* <div className="pattern" /> */}
+        <div className="absolute inset-0 top-0 z-[-1]">
           <LightRays
-            raysOrigin="top-center"
-            raysColor="#FFFF"
-            raysSpeed={0.1}
-            lightSpread={0.5}
-            rayLength={1}
+            raysOrigin="top-right"
+            raysColor="#ffff"
+            raysSpeed={0.3}
+            lightSpread={0.8}
+            rayLength={1.2}
             followMouse={true}
             mouseInfluence={0.02}
             noiseAmount={0.1}
-            fadeDistance={1}
+            distortion={0.01}
+
           />
+        </div>
+        <div className="absolute inset-0 top-0 z-[-1]">
+          <LightRays
+            raysOrigin="top-left"
+            raysColor="#ffff"
+            raysSpeed={0.3}
+            lightSpread={0.8}
+            rayLength={1.2}
+            followMouse={true}
+            mouseInfluence={0.02}
+            noiseAmount={0.1}
+            distortion={0.01}
 
 
+          />
         </div>
 
-        <main className="relative flex flex-col min-h-screen ">
+        <main className="min-h-screen w-full ">
           {children}
 
         </main>

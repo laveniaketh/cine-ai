@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* @custom-variant dark (&:is(.dark *)); */
 
 /* :root {
   --color-blue: #94eaff;
@@ -50,8 +50,8 @@
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+  --popover: #1b1a16;
+  --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.852 0.199 91.936);
   --primary-foreground: oklch(0.421 0.095 57.708);
   --secondary: oklch(0.967 0.001 286.375);
@@ -192,7 +192,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50 font-schibsted-grotesk;
+    @apply border-border outline-ring/50 font-figtree;
   }
 
   body {
@@ -214,9 +214,9 @@
   ul {
     @apply list-none;
   }
-  p {
-    @apply font-schibsted-grotesk;
-  }
+  /* p {
+    @apply font-figtree;
+  } */
 }
 
 @layer components {
