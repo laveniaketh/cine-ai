@@ -149,7 +149,7 @@ import {
 
 const BentoDashboard = () => {
     return (
-        <BentoGrid className="max-w-7xl mx-auto md:auto-rows-[20rem] mt-10 font-figtree">
+        <BentoGrid className=" mx-auto md:auto-rows-[20rem] mt-10 font-figtree">
             {items.map((item, i) => (
                 <BentoGridItem
                     key={i}
