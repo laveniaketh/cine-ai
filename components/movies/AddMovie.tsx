@@ -200,7 +200,6 @@ export const AddMovie = ({ monthlyRanges, weeklyDateRanges, timeSlots, onMovieAd
                                     value={summary}
                                     onChange={(e) => setSummary(e.target.value)}
                                     className="h-[240px] bg-neutral-800 border-neutral-700 text-white placeholder:text-gray-500 resize-none"
-                                    required
                                 />
                             </div>
                         </div>
@@ -246,7 +245,6 @@ export const AddMovie = ({ monthlyRanges, weeklyDateRanges, timeSlots, onMovieAd
                                         value={movieTitle}
                                         onChange={(e) => setMovieTitle(e.target.value)}
                                         className="bg-neutral-800 border-neutral-700 text-white placeholder:text-gray-500"
-                                        required
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -257,7 +255,6 @@ export const AddMovie = ({ monthlyRanges, weeklyDateRanges, timeSlots, onMovieAd
                                         value={releasedYear}
                                         onChange={(e) => setReleasedYear(e.target.value)}
                                         className="bg-neutral-800 border-neutral-700 text-white placeholder:text-gray-500"
-                                        required
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -267,7 +264,6 @@ export const AddMovie = ({ monthlyRanges, weeklyDateRanges, timeSlots, onMovieAd
                                         value={director}
                                         onChange={(e) => setDirector(e.target.value)}
                                         className="bg-neutral-800 border-neutral-700 text-white placeholder:text-gray-500"
-                                        required
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -278,7 +274,6 @@ export const AddMovie = ({ monthlyRanges, weeklyDateRanges, timeSlots, onMovieAd
                                         value={duration}
                                         onChange={(e) => setDuration(e.target.value)}
                                         className="bg-neutral-800 border-neutral-700 text-white placeholder:text-gray-500"
-                                        required
                                     />
                                 </div>
                             </div>
