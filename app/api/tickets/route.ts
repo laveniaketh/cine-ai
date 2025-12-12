@@ -11,12 +11,33 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    const { movieTitle, seatsSelected, paymentAmount, paymentStatus } = body;
+    const {
+      movieTitle,
+      seatsSelected,
+      paymentAmount,
+      paymentStatus,
+      platform,
+    } = body;
 
     // Validate required fields
-    if (!movieTitle || !seatsSelected || !paymentAmount || !paymentStatus) {
+    if (
+      !movieTitle ||
+      !seatsSelected ||
+      !paymentAmount ||
+      !paymentStatus ||
+      !platform
+    ) {
       return NextResponse.json(
         { message: "Required fields are missing" },
+        { status: 400 }
+      );
+    }
+
+    // Validate platform
+    const validPlatforms = ["kiosk", "website"];
+    if (!validPlatforms.includes(platform.toLowerCase())) {
+      return NextResponse.json(
+        { message: "platform must be kiosk or website" },
         { status: 400 }
       );
     }
@@ -82,7 +103,7 @@ export async function POST(req: NextRequest) {
     const ticket = await Ticket.create({
       ticket_id: newTicketId,
       movie_id: movie._id,
-      platform: "website",
+      platform: platform.toLowerCase(),
     });
 
     // Create payment record
@@ -166,8 +187,17 @@ export async function GET() {
       })
     );
 
+    // Filter out incomplete tickets (no payment or no reserved seats)
+    const validTickets = ticketsWithDetails.filter(
+      (ticket) =>
+        ticket.ticket_id &&
+        ticket.payment &&
+        ticket.reservedSeats &&
+        ticket.reservedSeats.length > 0
+    );
+
     return NextResponse.json(
-      { message: "Tickets fetched successfully", tickets: ticketsWithDetails },
+      { message: "Tickets fetched successfully", tickets: validTickets },
       { status: 200 }
     );
   } catch (e) {

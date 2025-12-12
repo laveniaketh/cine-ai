@@ -13,7 +13,6 @@ const TicketSchema = new Schema<ITicket>(
     ticket_id: {
       type: Number,
       required: [true, "Ticket ID is required"],
-      unique: true,
     },
     movie_id: {
       type: Schema.Types.ObjectId,

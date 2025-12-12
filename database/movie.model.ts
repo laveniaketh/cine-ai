@@ -27,9 +27,9 @@ const MovieSchema = new Schema<IMovie>(
     },
     slug: {
       type: String,
-      unique: true,
       lowercase: true,
       trim: true,
+      unique: true,
     },
     director: {
       type: String,
@@ -105,7 +105,7 @@ MovieSchema.pre("save", function (next) {
     movie.timeslot = normalizeTime(movie.timeslot);
   }
 
-  // next();
+  next();
 });
 
 // Helper function to generate URL-friendly slug

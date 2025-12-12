@@ -85,44 +85,57 @@ const Tickets = () => {
     const itemsPerPage = 8
 
     // Fetch tickets from database
-    useEffect(() => {
-        const fetchTickets = async () => {
-            try {
-                setLoading(true)
-                const response = await fetch("/api/tickets")
-                const data = await response.json()
+    const fetchTickets = async () => {
+        try {
+            setLoading(true)
+            const response = await fetch("/api/tickets")
+            const data = await response.json()
 
-                if (response.ok && data.tickets) {
-                    // Transform API data to match component format
-                    const transformedTickets: TicketData[] = data.tickets.map((ticket: any) => {
-                        const createdDate = new Date(ticket.createdAt)
-                        return {
-                            id: `TKT-${String(ticket.ticket_id).padStart(3, '0')}`,
-                            date: createdDate.toISOString().split('T')[0],
-                            time: ticket.movie?.timeslot || "N/A",
-                            seats: ticket.reservedSeats || [],
-                            qty: ticket.reservedSeats?.length || 0,
-                            total: ticket.payment?.paymentAmount || 0,
-                            status: ticket.payment?.paymentStatus || "pending",
-                            platform: ticket.platform || "website",
-                            paymentMethod: ticket.platform === "kiosk" ? "cash" : "online",
-                            createdAt: createdDate
-                        }
-                    })
-                    setTickets(transformedTickets)
-                }
-            } catch (error) {
-                console.error("Failed to fetch tickets:", error)
-            } finally {
-                setLoading(false)
+            if (response.ok && data.tickets) {
+                // Transform API data to match component format
+                const transformedTickets: TicketData[] = data.tickets.map((ticket: any) => {
+                    const createdDate = new Date(ticket.createdAt)
+                    return {
+                        id: `TKT-${String(ticket.ticket_id).padStart(3, '0')}`,
+                        date: createdDate.toISOString().split('T')[0],
+                        time: createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+                        seats: ticket.reservedSeats || [],
+                        qty: ticket.reservedSeats?.length || 0,
+                        total: ticket.payment?.paymentAmount || 0,
+                        status: ticket.payment?.paymentStatus || "pending",
+                        platform: ticket.platform || "website",
+                        paymentMethod: ticket.platform === "kiosk" ? "cash" : "online",
+                        createdAt: createdDate
+                    }
+                })
+                setTickets(transformedTickets)
             }
+        } catch (error) {
+            console.error("Failed to fetch tickets:", error)
+        } finally {
+            setLoading(false)
         }
+    }
 
+    useEffect(() => {
         fetchTickets()
     }, [])
 
     // Auto-cancel expired kiosk payments
     useEffect(() => {
+        const cancelExpiredTicket = async (ticketId: string) => {
+            const numericId = parseInt(ticketId.replace("TKT-", ""))
+            try {
+                await fetch(`/api/tickets/${numericId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ paymentStatus: "cancelled" }),
+                })
+            } catch (error) {
+                console.error("Failed to auto-cancel ticket:", error)
+            }
+        }
+
         const timer = setInterval(() => {
             setCurrentTime(new Date())
             setTickets(prevTickets =>
@@ -133,7 +146,9 @@ const Tickets = () => {
                         ticket.paymentMethod === "cash"
                     ) {
                         const timeDiff = (Date.now() - ticket.createdAt.getTime()) / (1000 * 60)
-                        if (timeDiff >= 10) {
+                        if (timeDiff >= 20) {
+                            // Call API to update status in database
+                            cancelExpiredTicket(ticket.id)
                             return { ...ticket, status: "cancelled" as const }
                         }
                     }
@@ -156,7 +171,7 @@ const Tickets = () => {
         }
 
         const timeDiff = (currentTime.getTime() - ticket.createdAt.getTime()) / (1000 * 60)
-        const remainingMinutes = Math.max(0, 10 - timeDiff)
+        const remainingMinutes = Math.max(0, 20 - timeDiff)
         const minutes = Math.floor(remainingMinutes)
         const seconds = Math.floor((remainingMinutes - minutes) * 60)
 
@@ -212,19 +227,29 @@ const Tickets = () => {
         }
     }
 
-    const handleStatusChange = (ticketId: string, newStatus: string) => {
-        setTickets(prevTickets =>
-            prevTickets.map(ticket => {
-                if (ticket.id === ticketId) {
-                    // Website orders with online payment are always paid - cannot change status
-                    if (ticket.platform === "website" && ticket.paymentMethod === "online") {
-                        return ticket // Keep status as is (should always be paid)
-                    }
-                    return { ...ticket, status: newStatus }
-                }
-                return ticket
+    const handleStatusChange = async (ticketId: string, newStatus: string) => {
+        // Extract numeric ticket_id from formatted string (e.g., "TKT-001" -> 1)
+        const numericId = parseInt(ticketId.replace("TKT-", ""))
+
+        try {
+            const response = await fetch(`/api/tickets/${numericId}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ paymentStatus: newStatus }),
             })
-        )
+
+            if (response.ok) {
+                // Refetch tickets to get updated data from server
+                await fetchTickets()
+            } else {
+                const data = await response.json()
+                console.error("Failed to update status:", data.message)
+            }
+        } catch (error) {
+            console.error("Error updating payment status:", error)
+        }
     }
 
     const handleSort = (field: string) => {
@@ -442,8 +467,8 @@ const Tickets = () => {
                                             ₱{ticket.total.toLocaleString()}
                                         </TableCell>
                                         <TableCell>
-                                            {ticket.platform === "website" && ticket.paymentMethod === "online" ? (
-                                                // Website online payments are always paid - no dropdown
+                                            {(ticket.platform === "website" && ticket.paymentMethod === "online") || ticket.status === "paid" ? (
+                                                // Website online payments or paid tickets are not editable
                                                 <div className="flex items-center gap-1">
                                                     {getStatusBadge(ticket.status)}
                                                 </div>
