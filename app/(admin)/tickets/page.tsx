@@ -38,153 +38,18 @@ import {
 import { Search, Filter, ArrowUpDown, ChevronDown, BadgeCheckIcon } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
-// Mock data for tickets
-const mockTickets = [
-    {
-        id: "TKT-001",
-        date: "2024-12-04",
-        time: "14:30",
-        seats: ["A6", "A7"],
-        qty: 2,
-        total: 300,
-        status: "paid",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-04T14:20:00Z")
-    },
-    {
-        id: "TKT-002",
-        date: "2024-12-04",
-        time: "17:00",
-        seats: ["B3"],
-        qty: 1,
-        total: 150,
-        status: "pending",
-        platform: "kiosk",
-        paymentMethod: "cash",
-        createdAt: new Date(Date.now() - 3 * 60 * 1000) // 3 minutes ago
-    },
-    {
-        id: "TKT-003",
-        date: "2024-12-04",
-        time: "19:30",
-        seats: ["C4", "C5", "C6"],
-        qty: 3,
-        total: 450,
-        status: "paid",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-04T19:20:00Z")
-    },
-    {
-        id: "TKT-004",
-        date: "2024-12-04",
-        time: "14:30",
-        seats: ["D8"],
-        qty: 1,
-        total: 150,
-        status: "cancelled",
-        platform: "kiosk",
-        paymentMethod: "cash",
-        createdAt: new Date("2024-12-04T14:10:00Z")
-    },
-    {
-        id: "TKT-005",
-        date: "2024-12-04",
-        time: "21:45",
-        seats: ["E10", "E11"],
-        qty: 2,
-        total: 300,
-        status: "paid",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-04T21:35:00Z")
-    },
-    {
-        id: "TKT-006",
-        date: "2024-12-03",
-        time: "16:15",
-        seats: ["F5"],
-        qty: 1,
-        total: 150,
-        status: "pending",
-        platform: "kiosk",
-        paymentMethod: "cash",
-        createdAt: new Date(Date.now() - 7 * 60 * 1000) // 7 minutes ago
-    },
-    {
-        id: "TKT-007",
-        date: "2024-12-03",
-        time: "18:45",
-        seats: ["G7", "G8"],
-        qty: 2,
-        total: 300,
-        status: "paid",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-03T18:35:00Z")
-    },
-    {
-        id: "TKT-008",
-        date: "2024-12-03",
-        time: "20:30",
-        seats: ["H12", "H13", "H14"],
-        qty: 3,
-        total: 450,
-        status: "paid",
-        platform: "kiosk",
-        paymentMethod: "cash",
-        createdAt: new Date("2024-12-03T20:20:00Z")
-    },
-    {
-        id: "TKT-009",
-        date: "2024-12-03",
-        time: "15:00",
-        seats: ["A1", "A2"],
-        qty: 2,
-        total: 300,
-        status: "refunded",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-03T14:50:00Z")
-    },
-    {
-        id: "TKT-010",
-        date: "2024-12-02",
-        time: "19:00",
-        seats: ["B8", "B9", "B10"],
-        qty: 3,
-        total: 450,
-        status: "paid",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-02T18:50:00Z")
-    },
-    {
-        id: "TKT-011",
-        date: "2024-12-02",
-        time: "21:15",
-        seats: ["C12"],
-        qty: 1,
-        total: 150,
-        status: "pending",
-        platform: "kiosk",
-        paymentMethod: "cash",
-        createdAt: new Date(Date.now() - 12 * 60 * 1000) // 12 minutes ago (should auto-cancel)
-    },
-    {
-        id: "TKT-012",
-        date: "2024-12-02",
-        time: "14:00",
-        seats: ["D1", "D2"],
-        qty: 2,
-        total: 300,
-        status: "paid",
-        platform: "website",
-        paymentMethod: "online",
-        createdAt: new Date("2024-12-02T13:50:00Z")
-    }
-]
+type TicketData = {
+    id: string
+    date: string
+    time: string
+    seats: string[]
+    qty: number
+    total: number
+    status: "paid" | "pending" | "cancelled" | "refunded"
+    platform: "website" | "kiosk"
+    paymentMethod: "online" | "cash"
+    createdAt: Date
+}
 
 const getStatusBadge = (status: string) => {
     switch (status) {
@@ -214,9 +79,47 @@ const Tickets = () => {
     const [statusFilter, setStatusFilter] = useState("all")
     const [sortBy, setSortBy] = useState("date")
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
-    const [tickets, setTickets] = useState(mockTickets)
+    const [tickets, setTickets] = useState<TicketData[]>([])
     const [currentTime, setCurrentTime] = useState(new Date())
+    const [loading, setLoading] = useState(true)
     const itemsPerPage = 8
+
+    // Fetch tickets from database
+    useEffect(() => {
+        const fetchTickets = async () => {
+            try {
+                setLoading(true)
+                const response = await fetch("/api/tickets")
+                const data = await response.json()
+
+                if (response.ok && data.tickets) {
+                    // Transform API data to match component format
+                    const transformedTickets: TicketData[] = data.tickets.map((ticket: any) => {
+                        const createdDate = new Date(ticket.createdAt)
+                        return {
+                            id: `TKT-${String(ticket.ticket_id).padStart(3, '0')}`,
+                            date: createdDate.toISOString().split('T')[0],
+                            time: ticket.movie?.timeslot || "N/A",
+                            seats: ticket.reservedSeats || [],
+                            qty: ticket.reservedSeats?.length || 0,
+                            total: ticket.payment?.paymentAmount || 0,
+                            status: ticket.payment?.paymentStatus || "pending",
+                            platform: ticket.platform || "website",
+                            paymentMethod: ticket.platform === "kiosk" ? "cash" : "online",
+                            createdAt: createdDate
+                        }
+                    })
+                    setTickets(transformedTickets)
+                }
+            } catch (error) {
+                console.error("Failed to fetch tickets:", error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchTickets()
+    }, [])
 
     // Auto-cancel expired kiosk payments
     useEffect(() => {
@@ -231,7 +134,7 @@ const Tickets = () => {
                     ) {
                         const timeDiff = (Date.now() - ticket.createdAt.getTime()) / (1000 * 60)
                         if (timeDiff >= 10) {
-                            return { ...ticket, status: "cancelled" }
+                            return { ...ticket, status: "cancelled" as const }
                         }
                     }
                     return ticket
@@ -339,6 +242,22 @@ const Tickets = () => {
         setCurrentPage(1)
         setSearchTerm("")
         setStatusFilter("all")
+    }
+
+    if (loading) {
+        return (
+            <div className="p-6 space-y-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Ticket Orders</h1>
+                        <p className="text-gray-400">Manage and track all ticket orders</p>
+                    </div>
+                </div>
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                </div>
+            </div>
+        )
     }
 
     return (
