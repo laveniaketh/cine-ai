@@ -5,6 +5,8 @@ export interface ITicket extends Document {
   ticket_id: number;
   movie_id: Types.ObjectId;
   platform: string;
+  dayOfWeek: string;
+  weekNumber: string;
   createdAt: Date;
 }
 
@@ -29,11 +31,40 @@ const TicketSchema = new Schema<ITicket>(
         message: "Platform must be either kiosk or website",
       },
     },
+    dayOfWeek: {
+      type: String,
+      required: false,
+      trim: true,
+      enum: {
+        values: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        message: "Day of week must be Mon, Tue, Wed, Thu, Fri, Sat, or Sun",
+      },
+    },
+    weekNumber: {
+      type: String,
+      required: false,
+      trim: true,
+    },
   },
   {
     timestamps: true, // Auto-generate createdAt and updatedAt
   }
 );
+
+// Pre-save hook to automatically set dayOfWeek and weekNumber based on createdAt
+TicketSchema.pre("save", function () {
+  if (this.isNew) {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const date = this.createdAt || new Date();
+    this.dayOfWeek = days[date.getDay()];
+
+    const dayOfMonth = date.getDate();
+    // Calculate week number within the month (1-4)
+    // Days 1-7: Week 1, Days 8-14: Week 2, Days 15-21: Week 3, Days 22-31: Week 4
+    const weekNum = Math.ceil(dayOfMonth / 7);
+    this.weekNumber = `Week ${weekNum}`;
+  }
+});
 
 // Create index on ticket_id for better query performance
 TicketSchema.index({ ticket_id: 1 }, { unique: true });

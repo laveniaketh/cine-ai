@@ -133,6 +133,8 @@ export async function POST(req: NextRequest) {
           movie_id: ticket.movie_id,
           movieTitle: movie.movieTitle,
           platform: ticket.platform,
+          dayOfWeek: ticket.dayOfWeek,
+          weekNumber: ticket.weekNumber,
           createdAt: ticket.createdAt,
           payment: {
             paymentAmount: payment.paymentAmount,
@@ -175,6 +177,8 @@ export async function GET() {
           ticket_id: ticket.ticket_id,
           movie: ticket.movie_id,
           platform: ticket.platform,
+          dayOfWeek: ticket.dayOfWeek,
+          weekNumber: ticket.weekNumber,
           createdAt: ticket.createdAt,
           payment: payment
             ? {
