@@ -42,7 +42,16 @@ const SeatMapSkeleton = () => {
 
         const fetchReservedSeats = async () => {
             try {
-                const response = await fetch(`/api/tickets/seats?movie_id=${selectedMovie._id}`);
+                // Calculate current day of week and week number
+                const now = new Date();
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                const currentDayOfWeek = days[now.getDay()];
+                const dayOfMonth = now.getDate();
+                const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
+
+                const response = await fetch(
+                    `/api/tickets/seats?movie_id=${selectedMovie._id}&dayOfWeek=${currentDayOfWeek}&weekNumber=${currentWeekNumber}`
+                );
                 const data = await response.json();
                 setReservedSeats(data.reservedSeats || []);
             } catch (error) {

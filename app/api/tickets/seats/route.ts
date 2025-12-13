@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
     // Get movie_id from query parameters
     const { searchParams } = new URL(req.url);
     const movie_id = searchParams.get("movie_id");
+    const dayOfWeek = searchParams.get("dayOfWeek");
+    const weekNumber = searchParams.get("weekNumber");
 
     if (!movie_id) {
       return NextResponse.json(
@@ -19,8 +21,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Find all tickets for this movie
-    const tickets = await Ticket.find({ movie_id }).select("_id");
+    // Build query filter
+    const query: any = { movie_id };
+    if (dayOfWeek) query.dayOfWeek = dayOfWeek;
+    if (weekNumber) query.weekNumber = weekNumber;
+
+    // Find tickets for this movie filtered by day/week
+    const tickets = await Ticket.find(query).select("_id");
 
     if (!tickets || tickets.length === 0) {
       return NextResponse.json(

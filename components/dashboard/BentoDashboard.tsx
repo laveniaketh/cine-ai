@@ -5,8 +5,8 @@ import { BentoGrid, BentoGridItem } from "../ui/bento-grid";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement } from 'chart.js';
 import NowShowingSkeleton from "./NowShowingSkeleton";
 import SeatMapSkeleton from "./SeatMapSkeleton";
-import AgeRangeSkeleton from "./AgeRangeSkeleton";
 import SalesAnalyticsSkeleton from "./SalesAnalyticsSkeleton";
+import SeatsAvailabilitySkeleton from "./SeatsAvailabilitySkeleton";
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement);
 
@@ -38,9 +38,9 @@ const items = [
         className: "md:col-span-1",
     },
     {
-        title: "Age Range for People Who Goes to Cinema",
-        description: "Age groups that visit the  cinema most frequently.",
-        header: <AgeRangeSkeleton />,
+        title: "Seats Availability",
+        description: "Real-time seat availability for current movies.",
+        header: <SeatsAvailabilitySkeleton />,
         className: "md:col-span-1",
     },
     {
