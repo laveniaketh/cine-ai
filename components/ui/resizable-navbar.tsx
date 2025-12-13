@@ -147,7 +147,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
             onItemClick?.();
           }}
           className={cn(
-            "relative px-4 py-2 text-white hover:text-neutral-900 dark:text-neutral-300",
+            "relative px-4 py-2 text-white hover:text-neutral-150 dark:text-neutral-300",
             selected === idx && "text-neutral-900"
           )}
           key={`link-${idx}`}

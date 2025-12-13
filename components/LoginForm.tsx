@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 
 const LoginForm = () => {
     return (
-        <Card className="text-white relative overflow-hidden w-sm bg-[#2c2a26] border-none  justify-end-safe">
+        <Card className="text-white relative overflow-hidden w-sm border-neutral-700 bg-neutral-800 border-none  justify-end-safe">
 
             <CardHeader className="text-center">
                 <CardTitle className="text-xl mt-4">
