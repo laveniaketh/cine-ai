@@ -9,7 +9,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-
 import {
     Field,
     FieldGroup,
@@ -18,34 +17,62 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useActionState } from "react"
-import { login } from "@/app/actions/auth"
+import { signup } from "@/app/actions/auth"
 import Link from "next/link"
 
-const LoginForm = () => {
-    const [state, action, pending] = useActionState(login, undefined)
+const RegisterForm = () => {
+    const [state, action, pending] = useActionState(signup, undefined)
 
     return (
-        <Card className="text-white relative overflow-hidden w-sm border-neutral-700 bg-neutral-800 border-none  justify-end-safe">
+        <Card className="text-white relative overflow-hidden w-sm border-neutral-700 bg-neutral-800 border-none">
             <form action={action}>
                 <CardHeader className="text-center">
                     <CardTitle className="text-xl mt-4">
-                        CineAi Management System
+                        Create Admin Account
                     </CardTitle>
                     <CardDescription>
-                        Login to your account
+                        Register a new admin account
                     </CardDescription>
                 </CardHeader>
-                <CardContent >
+                <CardContent>
                     <div className="relative z-1">
                         <FieldSet>
-                            <FieldGroup >
+                            <FieldGroup>
+                                <Field>
+                                    <FieldLabel htmlFor="fullName">Full Name</FieldLabel>
+                                    <Input
+                                        id="fullName"
+                                        name="fullName"
+                                        type="text"
+                                        placeholder="Enter your full name"
+                                        required
+                                        disabled={pending}
+                                    />
+                                    {state?.errors?.fullName && (
+                                        <p className="text-sm text-red-500 mt-1">{state.errors.fullName}</p>
+                                    )}
+                                </Field>
+                                <Field>
+                                    <FieldLabel htmlFor="email">Email</FieldLabel>
+                                    <Input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        placeholder="Enter your email"
+                                        required
+                                        disabled={pending}
+                                    />
+                                    {state?.errors?.email && (
+                                        <p className="text-sm text-red-500 mt-1">{state.errors.email}</p>
+                                    )}
+                                </Field>
                                 <Field>
                                     <FieldLabel htmlFor="username">Username</FieldLabel>
                                     <Input
                                         id="username"
                                         name="username"
                                         type="text"
-                                        placeholder="Write your username"
+                                        placeholder="Choose a username"
                                         required
                                         disabled={pending}
                                     />
@@ -73,19 +100,18 @@ const LoginForm = () => {
                             </FieldGroup>
                         </FieldSet>
                     </div>
-                </CardContent >
-                <CardFooter className="flex-col gap-2 mt-6">
+                </CardContent>
+                <CardFooter className="flex-col gap-2 mt-4">
                     <Button type="submit" className="w-full" disabled={pending}>
-                        {pending ? "Logging in..." : "Login"}
+                        {pending ? "Creating Account..." : "Create Account"}
                     </Button>
-                    {/* <Link href="/login/admin/register" className="text-sm text-neutral-400 hover:text-white transition-colors">
-                        Don't have an account? Register
-                    </Link> */}
+                    <Link href="/login/admin" className="text-sm text-neutral-400 hover:text-white transition-colors">
+                        Already have an account? Login
+                    </Link>
                 </CardFooter>
-
             </form>
-        </Card >
+        </Card>
     )
 }
 
-export default LoginForm
+export default RegisterForm

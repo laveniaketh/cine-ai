@@ -19,6 +19,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut } from "lucide-react";
+import { logout } from "@/app/actions/auth";
 
 
 const AdminNav = () => {
@@ -39,6 +40,11 @@ const AdminNav = () => {
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+    const handleLogout = async () => {
+        const formData = new FormData();
+        await logout();
+    };
+
     return (
         <div className="relative w-full">
             <Navbar>
@@ -55,7 +61,7 @@ const AdminNav = () => {
                                 </Avatar>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem className="cursor-pointer">
+                                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                                     <LogOut className="mr-2 h-4 w-4" />
                                     <span>Logout</span>
                                 </DropdownMenuItem>
