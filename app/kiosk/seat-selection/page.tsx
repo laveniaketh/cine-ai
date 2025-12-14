@@ -13,7 +13,7 @@ const SeatSelectionPage = () => {
 
     return (
         <div className=" flex flex-col relative items-center justify-center ">
-            <h1 className="text-6xl tracking-tight text-gray-900 dark:text-white text-center">
+            <h1 className="text-6xl  text-gray-900 dark:text-white text-center">
                 <span className="text-gradient">Select</span> Your Seat
             </h1>
 

@@ -47,10 +47,10 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
     return (
         <div className="flex flex-col gap-2">
             <div className="rounded-lg shadow-lg border-neutral-700 bg-neutral-800 mt-4 mx-auto p-12">
-                <div className="flex flex-col items-center justify-evenly h-full">
-                    <div className="flex flex-col items-center justify-evenly h-full">
+                <div className="flex flex-col items-center justify-evenly h-full ">
+                    <div className="flex flex-col items-center justify-evenly h-full gap-2">
                         {/* Seat Selection Section */}
-                        <div className="text-white text-lg font-semibold flex justify-center items-center gap-5">
+                        <div className="text-white text-lg font-semibold flex justify-center items-center gap-5 mb-2">
                             <Image src="/selected-seat.png" alt="" width={40} height={40} className="w-10 h-10" />
                             <p>Selected</p>
                             <Image src="/avail-seat.png" alt="" width={40} height={40} className="w-10 h-10" />
@@ -117,11 +117,15 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
             </div>
             <div className="flex gap-2 justify-between">
                 <Link href="/kiosk/movie-selection">
-                    <Button>Back</Button>
+                    <Button className="text-2xl px-8 py-2 h-auto rounded-xl">Back</Button>
                 </Link>
-                <Link href="/kiosk/payment-confirmation">
-                    <Button disabled={selectedSeats.length === 0}>Next</Button>
-                </Link>
+                {selectedSeats.length === 0 ? (
+                    <Button disabled={true} className="text-2xl px-8 py-2 h-auto rounded-xl">Next</Button>
+                ) : (
+                    <Link href="/kiosk/payment-confirmation">
+                        <Button className="text-2xl px-8 py-2 h-auto rounded-xl">Next</Button>
+                    </Link>
+                )}
             </div>
         </div>
 
