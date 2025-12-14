@@ -7,7 +7,7 @@ const Hero = () => {
         <div className="flex flex-col relative items-center mx-auto my-auto justify-center ">
             <div className='flex flex-col items-center justify-center text-center relative'>
                 {/* Banner positioned behind the CineAI logo */}
-                <div className="absolute top-35 left-1/2 -translate-x-1/2 -z-10 scale-[3.5]">
+                <div className="absolute top-30 left-1/2 -translate-x-1/2 -z-10 scale-[3.5]">
                     <Image
                         src="/banner2.png"
                         alt="Hero Banner"

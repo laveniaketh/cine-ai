@@ -3,6 +3,34 @@ import connectDB from "@/lib/mongodb";
 import Movie from "@/database/movie.model";
 import { v2 as cloudinary } from "cloudinary";
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    await connectDB();
+
+    const { slug } = await params;
+
+    const movie = await Movie.findOne({ slug });
+
+    if (!movie) {
+      return NextResponse.json({ message: "Movie not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      { message: "Movie fetched successfully", movie },
+      { status: 200 }
+    );
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { message: "Movie fetch failed", error: e },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }

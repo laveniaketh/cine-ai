@@ -1,47 +1,72 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { div } from "motion/react-client";
+import { useMovieSelectionStore } from "@/lib/store/movie-selection";
+
 
 interface MovieDetails {
+    id: string;
     movietitle: string;
     timeslot: string;
 }
 
 interface SeatSelectionProps {
     movieDetails: MovieDetails;
-    initialSelectedSeats?: string[];
 }
 
 const SeatSelection: React.FC<SeatSelectionProps> = ({
-    movieDetails,
-    initialSelectedSeats = []
+    movieDetails
 }) => {
+    const selectedSeatsFromStore = useMovieSelectionStore((state) => state.selectedSeats);
+    const setSelectedSeats = useMovieSelectionStore((state) => state.setSelectedSeats);
+
     const rows = "ABCDEFGH".split("");
     const seatsPerRow = [8, 10, 12, 12, 12, 12, 14, 14]; // Seats per row: A-H
 
     // Mock sold seats data
     const soldSeats = ["A1", "A2", "B5", "C3", "D7", "E4"];
-    const [selectedSeats, setSelectedSeats] = useState<string[]>(initialSelectedSeats);
+    const [selectedSeats, setSelectedSeatsLocal] = useState<string[]>(selectedSeatsFromStore);
+
+    // Sync local state with store
+    useEffect(() => {
+        setSelectedSeatsLocal(selectedSeatsFromStore);
+    }, [selectedSeatsFromStore]);
+
+    // Sync store with local state changes
+    useEffect(() => {
+        setSelectedSeats(selectedSeats);
+    }, [selectedSeats, setSelectedSeats]);
 
     const toggleSeat = (seat: string) => {
         if (soldSeats.includes(seat)) return; // Prevent clicking on sold seats
 
-        if (selectedSeats.includes(seat)) {
-            setSelectedSeats(selectedSeats.filter((s) => s !== seat));
-        } else {
-            if (selectedSeats.length >= 20) return; // Limit to 20 seats
-            setSelectedSeats([...selectedSeats, seat]);
-        }
+        setSelectedSeatsLocal((prev) => {
+            if (prev.includes(seat)) {
+                return prev.filter((s) => s !== seat);
+            } else {
+                if (prev.length >= 20) return prev; // Limit to 20 seats
+                return [...prev, seat];
+            }
+        });
     };
 
     const getSeatImage = (seat: string) => {
         if (soldSeats.includes(seat)) return "/reserved-seat.png";
         if (selectedSeats.includes(seat)) return "/selected-seat.png";
         return "/avail-seat.png";
+    };
+
+    // Helper function to format 24-hour time to 12-hour format
+    const formatTo12Hour = (time: string): string => {
+        const [hourStr, minuteStr] = time.split(":");
+        let hour = parseInt(hourStr, 10);
+        const minute = minuteStr.padStart(2, "0");
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12 || 12;
+        return `${hour}:${minute} ${ampm}`;
     };
 
     return (
@@ -92,7 +117,7 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
             <div className="text-white text-lg  mt-4 flex gap-9 justify-start">
                 <div className="flex flex-col ">
                     <p>Movie: {movieDetails.movietitle}</p>
-                    <p>Timeslot: {movieDetails.timeslot}</p>
+                    <p>Timeslot: {formatTo12Hour(movieDetails.timeslot)}</p>
                 </div>
                 <div className="flex flex-col ">
                     <p className="text-white  ">

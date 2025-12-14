@@ -7,11 +7,14 @@ import "swiper/css/effect-coverflow";
 import { EffectCoverflow, Controller } from "swiper/modules";
 import Image from "next/image";
 import Link from "next/link";
+import { useMovieSelectionStore } from "@/lib/store/movie-selection";
 
 interface Movie {
     id: number;
     movietitle: string;
     previewPath: string;
+    posterPath: string;
+    slug: string;
     releasedYear: number;
     director: string;
     summary: string;
@@ -31,13 +34,28 @@ const PosterCarousel: React.FC<PosterCarouselProps> = ({
     swiperInstance,
     onMovieSelect
 }) => {
+    const setSelectedMovie = useMovieSelectionStore((state) => state.setSelectedMovie);
+
     const handleSwiperInit = (swiper: SwiperType) => {
         if (setSwiperInstance) {
             setSwiperInstance(swiper);
         }
     };
 
-    const handleSlideClick = (movie: Movie) => {
+    const handleMovieClick = (movie: Movie) => {
+        // Transform movie data to match store interface
+        const storeMovie = {
+            _id: movie.id.toString(),
+            movieTitle: movie.movietitle,
+            previewPath: movie.previewPath,
+            poster: movie.posterPath,
+            slug: movie.slug,
+            releasedYear: movie.releasedYear,
+            director: movie.director,
+            summary: movie.summary,
+            timeslot: movie.timeslot,
+        };
+        setSelectedMovie(storeMovie);
         if (onMovieSelect) {
             onMovieSelect(movie);
         }
@@ -66,10 +84,10 @@ const PosterCarousel: React.FC<PosterCarouselProps> = ({
                         key={movie.id}
                         className="w-48! h-72! flex justify-center items-center"
                     >
-                        {/* <Link href={`/kiosk/seat-selection/${movie.id}`} className="cursor-pointer"> */}
-                        <Link href="/kiosk/seat-selection" className="cursor-pointer">
+
+                        <Link href="/kiosk/seat-selection" className="cursor-pointer" onClick={() => handleMovieClick(movie)}>
                             <Image
-                                src={movie.previewPath}
+                                src={movie.posterPath}
                                 alt={movie.movietitle}
                                 width={192}
                                 height={288}

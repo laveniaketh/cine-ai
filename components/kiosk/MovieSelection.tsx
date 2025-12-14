@@ -38,6 +38,16 @@ const MovieSelection: React.FC<MovieSelectionProps> = ({
         }
     };
 
+    // Helper function to format 24-hour time to 12-hour format
+    const formatTo12Hour = (time: string): string => {
+        const [hourStr, minuteStr] = time.split(":");
+        let hour = parseInt(hourStr, 10);
+        const minute = minuteStr.padStart(2, "0");
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12 || 12;
+        return `${hour}:${minute} ${ampm}`;
+    };
+
     return (
         <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-r from-[#1E1E2F] to-[#2A2A3D]">
             <Swiper
@@ -74,7 +84,7 @@ const MovieSelection: React.FC<MovieSelectionProps> = ({
                             </p>
                             <p className="text-md font-light mb-2">{movie.summary}</p>
                             <p className="text-xl font-semibold mb-2">
-                                ₱200.00 • {movie.timeslot}
+                                ₱200.00 •  {formatTo12Hour(movie.timeslot)}
                             </p>
                         </div>
                     </SwiperSlide>

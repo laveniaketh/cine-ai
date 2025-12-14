@@ -1,27 +1,98 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { useMovieSelectionStore } from "@/lib/store/movie-selection";
 
 interface MovieDetails {
     movietitle: string;
     timeslot: string;
     posterPath: string;
+    slug: string;
 }
 
 const PaymentConfirmation = () => {
-    // Mock data - in real implementation, this would come from state/props
-    const movieDetails: MovieDetails = {
-        movietitle: "Movie Title",
-        timeslot: "7:00 PM",
-        posterPath: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=600&fit=crop",
+    const router = useRouter();
+    const selectedMovie = useMovieSelectionStore((state) => state.selectedMovie);
+    const selectedSeats = useMovieSelectionStore((state) => state.selectedSeats);
+    const clearSelection = useMovieSelectionStore((state) => state.clearSelection);
+
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleConfirmPurchase = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const seatPrice = 200;
+            const paymentAmount = selectedSeats.length * seatPrice;
+
+            const response = await fetch('/api/tickets', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    movieTitle: selectedMovie.movieTitle,
+                    seatsSelected: selectedSeats,
+                    paymentAmount: paymentAmount,
+                    paymentStatus: 'pending',
+                    platform: 'kiosk',
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to purchase ticket');
+            }
+
+            // Success - clear selection and navigate to success page
+            clearSelection();
+            router.push('/kiosk/payment-sucessful');
+        } catch (err) {
+            console.error('Purchase error:', err);
+            setError(err instanceof Error ? err.message : 'Failed to purchase ticket');
+        } finally {
+            setIsLoading(false);
+            setIsDialogOpen(false);
+        }
     };
 
-    const selectedSeats: string[] = ["A1", "A2"];
+    if (!selectedMovie || selectedSeats.length === 0) {
+        return (
+            <div className="flex flex-col relative items-center justify-center min-h-screen">
+                <p className="text-red-500 text-2xl">No movie or seats selected. Please go back to movie selection.</p>
+            </div>
+        );
+    }
+
+    const movieDetails: MovieDetails = {
+        movietitle: selectedMovie.movieTitle,
+        timeslot: selectedMovie.timeslot,
+        posterPath: selectedMovie.poster,
+        slug: selectedMovie.slug,
+    };
+
     const seatPrice = 200;
     const total = selectedSeats.length * seatPrice;
+
+    // Helper function to format 24-hour time to 12-hour format
+    const formatTo12Hour = (time: string): string => {
+        const [hourStr, minuteStr] = time.split(":");
+        let hour = parseInt(hourStr, 10);
+        const minute = minuteStr.padStart(2, "0");
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12 || 12;
+        return `${hour}:${minute} ${ampm}`;
+    };
 
     return (
         <div className="flex flex-col relative items-center justify-center">
@@ -68,7 +139,7 @@ const PaymentConfirmation = () => {
                     <div className="flex flex-col justify-between text-white w-[550px] h-[600px] p-8 border-2 border-neutral-700 rounded-lg bg-neutral-900/80  shadow-md">
                         <div className="flex flex-col gap-4">
                             <h2 className="text-5xl font-bold">{movieDetails.movietitle}</h2>
-                            <p className="text-2xl">Timeslot: {movieDetails.timeslot}</p>
+                            <p className="text-2xl">Timeslot: {formatTo12Hour(movieDetails.timeslot)}</p>
                             <p className="text-2xl">Seat(s): {selectedSeats.join(", ")}</p>
                         </div>
 
@@ -89,13 +160,66 @@ const PaymentConfirmation = () => {
                             <Link href="/kiosk/seat-selection">
                                 <Button variant="default" className="text-2xl px-8 py-2 h-auto rounded-xl">Back</Button>
                             </Link>
-                            <Link href="/kiosk/payment-sucessful">
-                                <Button variant="default" className="text-2xl px-8 py-2 h-auto rounded-xl">Confirm</Button>
-                            </Link>
+                            <Button
+                                variant="default"
+                                className="text-2xl px-8 py-2 h-auto rounded-xl"
+                                onClick={() => setIsDialogOpen(true)}
+                            >
+                                Confirm
+                            </Button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Error Message */}
+            {error && (
+                <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+                    <p className="font-semibold">Purchase Failed</p>
+                    <p>{error}</p>
+                </div>
+            )}
+
+            {/* Confirmation Dialog */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl">Confirm Purchase</DialogTitle>
+                        <DialogDescription className="text-lg">
+                            Are you sure you want to purchase {selectedSeats.length} ticket{selectedSeats.length > 1 ? 's' : ''} for "{movieDetails.movietitle}"?
+                            <br />
+                            <br />
+                            <strong>Total: ₱{total}</strong>
+                            <br />
+                            Seats: {selectedSeats.join(", ")}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                            disabled={isLoading}
+                            className="text-lg px-6 py-2"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleConfirmPurchase}
+                            disabled={isLoading}
+                            className="text-lg px-6 py-2"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <Spinner className="mr-2 h-4 w-4" />
+                                    Processing...
+                                </>
+                            ) : (
+                                'Confirm Purchase'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

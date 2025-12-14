@@ -1,15 +1,24 @@
 "use client";
 import React from 'react';
 import SeatSelection from '@/components/kiosk/SeatSelection';
+import { useMovieSelectionStore } from '@/lib/store/movie-selection';
 
 const SeatSelectionPage = () => {
-    // Mock data
-    const movieDetails = {
-        movietitle: "Wicked",
-        timeslot: "7:00 PM"
-    };
+    const selectedMovie = useMovieSelectionStore((state) => state.selectedMovie);
 
-    const initialSelectedSeats: string[] = [];
+    if (!selectedMovie) {
+        return (
+            <div className="flex flex-col relative items-center justify-center min-h-screen">
+                <p className="text-red-500 text-2xl">No movie selected. Please go back to movie selection.</p>
+            </div>
+        );
+    }
+
+    const movieDetails = {
+        id: selectedMovie._id,
+        movietitle: selectedMovie.movieTitle,
+        timeslot: selectedMovie.timeslot,
+    };
 
     return (
         <div className=" flex flex-col relative items-center justify-center ">
@@ -19,7 +28,6 @@ const SeatSelectionPage = () => {
 
             <SeatSelection
                 movieDetails={movieDetails}
-                initialSelectedSeats={initialSelectedSeats}
             />
 
         </div>

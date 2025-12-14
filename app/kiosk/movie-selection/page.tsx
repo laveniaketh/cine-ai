@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MovieSelection from "@/components/kiosk/MovieSelection";
 import PosterCarousel from "@/components/kiosk/PosterCarousel";
 import { Swiper as SwiperType } from "swiper";
@@ -9,62 +9,95 @@ interface Movie {
     id: number;
     movietitle: string;
     previewPath: string;
+    posterPath: string;
+    slug: string;
     releasedYear: number;
     director: string;
     summary: string;
     timeslot: string;
 }
 
-// Mock movies data - same as MovieSelection
-const mockMovies: Movie[] = [
-    {
-        id: 1,
-        movietitle: "The Shawshank Redemption",
-        previewPath: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1920&h=1080&fit=crop",
-        releasedYear: 1994,
-        director: "Frank Darabont",
-        summary: "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
-        timeslot: "7:00 PM - 9:30 PM",
-    },
-    {
-        id: 2,
-        movietitle: "The Godfather",
-        previewPath: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=1920&h=1080&fit=crop",
-        releasedYear: 1972,
-        director: "Francis Ford Coppola",
-        summary: "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant son.",
-        timeslot: "8:00 PM - 10:45 PM",
-    },
-    {
-        id: 3,
-        movietitle: "Pulp Fiction",
-        previewPath: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&h=1080&fit=crop",
-        releasedYear: 1994,
-        director: "Quentin Tarantino",
-        summary: "The lives of two mob hitmen, a boxer, a gangster and his wife intertwine in four tales of violence and redemption.",
-        timeslot: "9:00 PM - 11:30 PM",
-    },
-];
-
 const SelectMovie = () => {
     const [movieSwiper, setMovieSwiper] = useState<SwiperType | null>(null);
     const [posterSwiper, setPosterSwiper] = useState<SwiperType | null>(null);
+    const [movies, setMovies] = useState<Movie[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
+    useEffect(() => {
+        const fetchMovies = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch("/api/movies");
 
+                if (!response.ok) {
+                    throw new Error("Failed to fetch movies");
+                }
+
+                const data = await response.json();
+
+                // Transform the data to match the Movie interface
+                const transformedMovies: Movie[] = data.movies.map((movie: any) => ({
+                    id: movie._id,
+                    movietitle: movie.movieTitle,
+                    previewPath: movie.preview,
+                    posterPath: movie.poster,
+                    slug: movie.slug,
+                    releasedYear: movie.releasedYear,
+                    director: movie.director,
+                    summary: movie.summary,
+                    timeslot: movie.timeslot,
+                }));
+
+                setMovies(transformedMovies);
+                setError(null);
+            } catch (err) {
+                console.error("Error fetching movies:", err);
+                setError(err instanceof Error ? err.message : "Failed to load movies");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchMovies();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="fixed inset-0 w-screen h-screen overflow-hidden flex items-center justify-center bg-[#171718]">
+                <p className="text-white text-2xl">Loading movies...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="fixed inset-0 w-screen h-screen overflow-hidden flex items-center justify-center bg-[#171718]">
+                <p className="text-red-500 text-2xl">Error: {error}</p>
+            </div>
+        );
+    }
+
+    if (movies.length === 0) {
+        return (
+            <div className="fixed inset-0 w-screen h-screen overflow-hidden flex items-center justify-center bg-[#171718]">
+                <p className="text-white text-2xl">No movies available</p>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 w-screen h-screen overflow-hidden">
             <MovieSelection
-                movies={mockMovies}
+                movies={movies}
                 setSwiperInstance={setMovieSwiper}
                 swiperInstance={posterSwiper}
             />
             <div className="absolute bottom-0 right-4">
                 <PosterCarousel
-                    movies={mockMovies}
+                    movies={movies}
                     setSwiperInstance={setPosterSwiper}
                     swiperInstance={movieSwiper}
-                // onMovieSelect={handleMovieSelect}
                 />
             </div>
         </div>
