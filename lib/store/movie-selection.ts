@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface Movie {
   _id: string;
@@ -20,10 +21,17 @@ interface MovieSelectionState {
   clearSelection: () => void;
 }
 
-export const useMovieSelectionStore = create<MovieSelectionState>((set) => ({
-  selectedMovie: null,
-  selectedSeats: [],
-  setSelectedMovie: (movie) => set({ selectedMovie: movie }),
-  setSelectedSeats: (seats) => set({ selectedSeats: seats }),
-  clearSelection: () => set({ selectedMovie: null, selectedSeats: [] }),
-}));
+export const useMovieSelectionStore = create<MovieSelectionState>()(
+  persist(
+    (set) => ({
+      selectedMovie: null,
+      selectedSeats: [],
+      setSelectedMovie: (movie) => set({ selectedMovie: movie }),
+      setSelectedSeats: (seats) => set({ selectedSeats: seats }),
+      clearSelection: () => set({ selectedMovie: null, selectedSeats: [] }),
+    }),
+    {
+      name: "movie-selection-storage",
+    }
+  )
+);

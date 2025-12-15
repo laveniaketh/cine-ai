@@ -31,27 +31,49 @@ const PaymentConfirmation = () => {
         setError(null);
 
         try {
+            // Validate that we have required data
+            if (!selectedMovie || !selectedSeats || selectedSeats.length === 0) {
+                throw new Error('Missing movie or seat selection');
+            }
+
             const seatPrice = 200;
             const paymentAmount = selectedSeats.length * seatPrice;
 
+            // Prepare the request body
+            const requestBody = {
+                movieTitle: selectedMovie.movieTitle,
+                seatsSelected: selectedSeats,
+                paymentAmount: paymentAmount,
+                paymentStatus: 'pending',
+                platform: 'kiosk',
+            };
+
+            // Send POST request
             const response = await fetch('/api/tickets', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    movieTitle: selectedMovie.movieTitle,
-                    seatsSelected: selectedSeats,
-                    paymentAmount: paymentAmount,
-                    paymentStatus: 'pending',
-                    platform: 'kiosk',
-                }),
+                body: JSON.stringify(requestBody),
             });
 
             const data = await response.json();
 
+            // Handle different error cases
             if (!response.ok) {
-                throw new Error(data.message || 'Failed to purchase ticket');
+                if (response.status === 409 && data.reservedSeats) {
+                    // Seats already reserved
+                    throw new Error(`The following seats are already reserved: ${data.reservedSeats.join(', ')}. Please select different seats.`);
+                } else if (response.status === 404) {
+                    // Movie not found
+                    throw new Error('Movie not found. Please try again.');
+                } else if (response.status === 400) {
+                    // Bad request
+                    throw new Error(data.message || 'Invalid request. Please check your selection.');
+                } else {
+                    // Generic error
+                    throw new Error(data.message || 'Failed to process your purchase');
+                }
             }
 
             // Success - clear selection and navigate to success page
@@ -59,7 +81,12 @@ const PaymentConfirmation = () => {
             router.push('/kiosk/payment-sucessful');
         } catch (err) {
             console.error('Purchase error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to purchase ticket');
+            setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
+
+            // Auto-dismiss error after 5 seconds
+            setTimeout(() => {
+                setError(null);
+            }, 5000);
         } finally {
             setIsLoading(false);
             setIsDialogOpen(false);
@@ -69,7 +96,14 @@ const PaymentConfirmation = () => {
     if (!selectedMovie || selectedSeats.length === 0) {
         return (
             <div className="flex flex-col relative items-center justify-center min-h-screen">
-                <p className="text-red-500 text-2xl">No movie or seats selected. Please go back to movie selection.</p>
+                <div className="text-center space-y-4">
+                    <p className="text-red-500 text-2xl">No movie or seats selected.</p>
+                    <Link href="/kiosk/movie-selection">
+                        <Button className="text-xl px-6 py-3">
+                            Go to Movie Selection
+                        </Button>
+                    </Link>
+                </div>
             </div>
         );
     }
@@ -158,12 +192,19 @@ const PaymentConfirmation = () => {
 
                         <div className="flex flex-row items-end justify-between">
                             <Link href="/kiosk/seat-selection">
-                                <Button variant="default" className="text-2xl px-8 py-2 h-auto rounded-xl">Back</Button>
+                                <Button
+                                    variant="default"
+                                    className="text-2xl px-8 py-2 h-auto rounded-xl"
+                                    disabled={isLoading}
+                                >
+                                    Back
+                                </Button>
                             </Link>
                             <Button
                                 variant="default"
                                 className="text-2xl px-8 py-2 h-auto rounded-xl"
                                 onClick={() => setIsDialogOpen(true)}
+                                disabled={isLoading}
                             >
                                 Confirm
                             </Button>
@@ -174,9 +215,21 @@ const PaymentConfirmation = () => {
 
             {/* Error Message */}
             {error && (
-                <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
-                    <p className="font-semibold">Purchase Failed</p>
-                    <p>{error}</p>
+                <div className="fixed top-4 right-4 bg-red-500/90 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md">
+                    <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                            <p className="font-semibold text-lg mb-1">Purchase Failed</p>
+                            <p className="text-sm">{error}</p>
+                        </div>
+                        <button
+                            onClick={() => setError(null)}
+                            className="text-white hover:text-gray-200 transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             )}
 
