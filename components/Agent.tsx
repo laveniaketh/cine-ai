@@ -48,7 +48,8 @@ export default function Agent({ movieData }: AgentProps) {
                 // Ignore if no call is active
             }
 
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // Reduced delay for faster response (was 300ms)
+            // await new Promise(resolve => setTimeout(resolve, 300));
 
             const message = navigationMessages[step];
             if (!message) return;
@@ -236,11 +237,8 @@ export default function Agent({ movieData }: AgentProps) {
     useEffect(() => {
         const currentStep = getStepFromPath(pathname);
         if (currentStep && isNavigationActive) {
-            // Small delay to ensure page has rendered
-            const timer = setTimeout(() => {
-                startNavigationAssistant(currentStep);
-            }, 800);
-            return () => clearTimeout(timer);
+            // Remove or reduce delay for faster navigation message
+            startNavigationAssistant(currentStep);
         }
     }, [pathname, isNavigationActive, startNavigationAssistant]);
 
@@ -334,8 +332,8 @@ export default function Agent({ movieData }: AgentProps) {
                         <button
                             onClick={isChatbotActive ? stopChatbot : startChatbot}
                             className={`w-full py-3 rounded-xl font-semibold transition-all text-lg ${isChatbotActive
-                                    ? "bg-red-600 hover:bg-red-700 text-white"
-                                    : "bg-neutral-700 hover:bg-neutral-600 text-white"
+                                ? "bg-red-600 hover:bg-red-700 text-white"
+                                : "bg-neutral-700 hover:bg-neutral-600 text-white"
                                 }`}
                         >
                             {isChatbotActive ? "End Conversation" : "Start Talking"}

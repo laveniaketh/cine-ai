@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag, unstable_cache } from "next/cache";
 import connectDB from "@/lib/mongodb";
 import Movie from "@/database/movie.model";
 import { v2 as cloudinary } from "cloudinary";
+
+// Cached function to fetch movies
+const getCachedMovies = unstable_cache(
+  async () => {
+    await connectDB();
+    const movies = await Movie.find().sort({ createdAt: -1 });
+    return movies;
+  },
+  ["movies-list"], // Cache key
+  {
+    revalidate: 300, // Revalidate every 5 minutes (300 seconds)
+    tags: ["movies"], // Tag for on-demand revalidation
+  }
+);
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,6 +100,9 @@ export async function POST(req: NextRequest) {
 
     const createdMovie = await Movie.create(movie);
 
+    // Revalidate movies cache after creating a new movie
+    revalidateTag("movies");
+
     return NextResponse.json(
       { message: "Movie created successfully", movie: createdMovie },
       { status: 201 }
@@ -103,13 +121,18 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    await connectDB();
-
-    const movies = await Movie.find().sort({ createdAt: -1 });
+    // Use cached function to fetch movies
+    const movies = await getCachedMovies();
 
     return NextResponse.json(
       { message: "Movies fetched successfully", movies },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          // Cache for 5 minutes on CDN, serve stale for up to 10 minutes while revalidating
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      }
     );
   } catch (e) {
     return NextResponse.json(

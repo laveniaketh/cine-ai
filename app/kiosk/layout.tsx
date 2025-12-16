@@ -23,10 +23,10 @@ const KioskLayout = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <div className="relative min-h-screen">
+        <div >
             {children}
-            <Agent movieData={movieData} />
-        </div>
+            {/* <Agent movieData={movieData} /> */}
+        </div >
     );
 };
 

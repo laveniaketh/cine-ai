@@ -39,6 +39,13 @@ const PaymentConfirmation = () => {
             const seatPrice = 200;
             const paymentAmount = selectedSeats.length * seatPrice;
 
+            // Calculate current day of week and week number
+            const now = new Date();
+            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const currentDayOfWeek = days[now.getDay()];
+            const dayOfMonth = now.getDate();
+            const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
+
             // Prepare the request body
             const requestBody = {
                 movieTitle: selectedMovie.movieTitle,
@@ -46,6 +53,8 @@ const PaymentConfirmation = () => {
                 paymentAmount: paymentAmount,
                 paymentStatus: 'pending',
                 platform: 'kiosk',
+                dayOfWeek: currentDayOfWeek,
+                weekNumber: currentWeekNumber,
             };
 
             // Send POST request
@@ -59,21 +68,9 @@ const PaymentConfirmation = () => {
 
             const data = await response.json();
 
-            // Handle different error cases
+            // Handle error responses
             if (!response.ok) {
-                if (response.status === 409 && data.reservedSeats) {
-                    // Seats already reserved
-                    throw new Error(`The following seats are already reserved: ${data.reservedSeats.join(', ')}. Please select different seats.`);
-                } else if (response.status === 404) {
-                    // Movie not found
-                    throw new Error('Movie not found. Please try again.');
-                } else if (response.status === 400) {
-                    // Bad request
-                    throw new Error(data.message || 'Invalid request. Please check your selection.');
-                } else {
-                    // Generic error
-                    throw new Error(data.message || 'Failed to process your purchase');
-                }
+                throw new Error(data.message || 'Failed to process your purchase. Please try again.');
             }
 
             // Success - clear selection and navigate to success page
