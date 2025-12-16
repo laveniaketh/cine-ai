@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useMovieSelectionStore } from "@/lib/store/movie-selection";
 
-
 interface MovieDetails {
     id: string;
     movietitle: string;
@@ -26,9 +25,57 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
     const rows = "ABCDEFGH".split("");
     const seatsPerRow = [8, 10, 12, 12, 12, 12, 14, 14]; // Seats per row: A-H
 
-    // Mock sold seats data
-    const soldSeats = ["A1", "A2", "B5", "C3", "D7", "E4"];
+    // State for sold/reserved seats fetched from backend
+    const [soldSeats, setSoldSeats] = useState<string[]>([]);
+    const [reservedSeats, setReservedSeats] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedSeats, setSelectedSeatsLocal] = useState<string[]>(selectedSeatsFromStore);
+
+    // Fetch reserved seats from backend
+    useEffect(() => {
+        const fetchReservedSeats = async () => {
+            if (!movieDetails.id) return;
+
+            try {
+                setLoading(true);
+                // Calculate current day of week and week number
+                const now = new Date();
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                const currentDayOfWeek = days[now.getDay()];
+                const dayOfMonth = now.getDate();
+                const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
+
+                const response = await fetch(
+                    `/api/tickets/seats?movie_id=${movieDetails.id}&dayOfWeek=${currentDayOfWeek}&weekNumber=${currentWeekNumber}`
+                );
+                const data = await response.json();
+
+                // Filter seats that are pending (reserved)
+                const reservedSeatsList = (data.reservedSeats || [])
+                    .filter((seat: { seatNumber: string; paymentStatus: string }) =>
+                        seat.paymentStatus === 'pending'
+                    )
+                    .map((seat: { seatNumber: string }) => seat.seatNumber);
+
+                // Filter seats that are paid or sold
+                const soldSeatsList = (data.reservedSeats || [])
+                    .filter((seat: { seatNumber: string; paymentStatus: string }) =>
+                        seat.paymentStatus === 'paid' || seat.paymentStatus === 'sold'
+                    )
+                    .map((seat: { seatNumber: string }) => seat.seatNumber);
+
+                setReservedSeats(reservedSeatsList);
+                setSoldSeats(soldSeatsList);
+            } catch (error) {
+                console.error('Error fetching reserved seats:', error);
+                setSoldSeats([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchReservedSeats();
+    }, [movieDetails.id]);
 
     // Sync local state with store
     useEffect(() => {
@@ -41,7 +88,7 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
     }, [selectedSeats, setSelectedSeats]);
 
     const toggleSeat = (seat: string) => {
-        if (soldSeats.includes(seat)) return; // Prevent clicking on sold seats
+        if (soldSeats.includes(seat) || reservedSeats.includes(seat)) return; // Prevent clicking on sold or reserved seats
 
         setSelectedSeatsLocal((prev) => {
             if (prev.includes(seat)) {
@@ -54,7 +101,8 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
     };
 
     const getSeatImage = (seat: string) => {
-        if (soldSeats.includes(seat)) return "/reserved-seat.png";
+        if (soldSeats.includes(seat)) return "/paid-seat.png";
+        if (reservedSeats.includes(seat)) return "/reserved-seat.png";
         if (selectedSeats.includes(seat)) return "/selected-seat.png";
         return "/avail-seat.png";
     };
@@ -69,6 +117,18 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
         return `${hour}:${minute} ${ampm}`;
     };
 
+    if (loading) {
+        return (
+            <div className="flex flex-col gap-2">
+                <div className="rounded-lg shadow-lg border-neutral-700 bg-neutral-800 mt-4 mx-auto p-12">
+                    <div className="flex items-center justify-center h-full text-white">
+                        Loading seat information...
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-2">
             <div className="rounded-lg shadow-lg border-neutral-700 bg-neutral-800 mt-4 mx-auto p-12">
@@ -81,7 +141,9 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                             <Image src="/avail-seat.png" alt="" width={40} height={40} className="w-10 h-10" />
                             <p>Available</p>
                             <Image src="/reserved-seat.png" alt="" width={40} height={40} className="w-10 h-10" />
-                            <p>Booked</p>
+                            <p>Reserved</p>
+                            <Image src="/paid-seat.png" alt="" width={40} height={40} className="w-10 h-10" />
+                            <p>Sold</p>
                         </div>
                         <div className="w-150 h-8 bg-[#171718] rounded-lg text-white text-lg font-bold flex items-center justify-center mb-4">
                             Screen
@@ -98,7 +160,7 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                                                 alt={`Seat ${seat}`}
                                                 width={48}
                                                 height={48}
-                                                className={`w-12 h-12 cursor-pointer ${soldSeats.includes(seat) ? "opacity-50" : ""
+                                                className={`w-12 h-12 cursor-pointer ${(soldSeats.includes(seat) || reservedSeats.includes(seat)) ? "cursor-not-allowed" : ""
                                                     }`}
                                                 onClick={() => toggleSeat(seat)}
                                             />
@@ -108,10 +170,7 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                             ))}
                         </div>
                     </div>
-
-
                 </div>
-
             </div >
             {/* Movie Details */}
             <div className="text-white text-lg  mt-4 flex gap-9 justify-start">
@@ -135,10 +194,6 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                         )}
                     </div>
                 </div>
-
-
-
-
             </div>
             <div className="flex gap-2 justify-between">
                 <Link href="/kiosk/movie-selection">
@@ -153,10 +208,7 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                 )}
             </div>
         </div>
-
-
-
     );
 };
 
-export default SeatSelection;
+export default SeatSelection;   
