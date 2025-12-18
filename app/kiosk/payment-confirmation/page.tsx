@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useMovieSelectionStore } from "@/lib/store/movie-selection";
+import { LoaderOne } from "@/components/ui/loader";
 
 interface MovieDetails {
     movietitle: string;
@@ -20,8 +21,6 @@ const PaymentConfirmation = () => {
     const router = useRouter();
     const selectedMovie = useMovieSelectionStore((state) => state.selectedMovie);
     const selectedSeats = useMovieSelectionStore((state) => state.selectedSeats);
-    const clearSelection = useMovieSelectionStore((state) => state.clearSelection);
-
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -39,6 +38,13 @@ const PaymentConfirmation = () => {
             const seatPrice = 200;
             const paymentAmount = selectedSeats.length * seatPrice;
 
+            // Calculate current day of week and week number
+            const now = new Date();
+            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const currentDayOfWeek = days[now.getDay()];
+            const dayOfMonth = now.getDate();
+            const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
+
             // Prepare the request body
             const requestBody = {
                 movieTitle: selectedMovie.movieTitle,
@@ -46,6 +52,8 @@ const PaymentConfirmation = () => {
                 paymentAmount: paymentAmount,
                 paymentStatus: 'pending',
                 platform: 'kiosk',
+                dayOfWeek: currentDayOfWeek,
+                weekNumber: currentWeekNumber,
             };
 
             // Send POST request
@@ -59,25 +67,12 @@ const PaymentConfirmation = () => {
 
             const data = await response.json();
 
-            // Handle different error cases
+            // Handle error responses
             if (!response.ok) {
-                if (response.status === 409 && data.reservedSeats) {
-                    // Seats already reserved
-                    throw new Error(`The following seats are already reserved: ${data.reservedSeats.join(', ')}. Please select different seats.`);
-                } else if (response.status === 404) {
-                    // Movie not found
-                    throw new Error('Movie not found. Please try again.');
-                } else if (response.status === 400) {
-                    // Bad request
-                    throw new Error(data.message || 'Invalid request. Please check your selection.');
-                } else {
-                    // Generic error
-                    throw new Error(data.message || 'Failed to process your purchase');
-                }
+                throw new Error(data.message || 'Failed to process your purchase. Please try again.');
             }
 
-            // Success - clear selection and navigate to success page
-            clearSelection();
+
             router.push('/kiosk/payment-sucessful');
         } catch (err) {
             console.error('Purchase error:', err);
@@ -127,6 +122,14 @@ const PaymentConfirmation = () => {
         hour = hour % 12 || 12;
         return `${hour}:${minute} ${ampm}`;
     };
+
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 w-screen h-screen overflow-hidden flex items-center justify-center">
+                <LoaderOne />
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col relative items-center justify-center">
@@ -237,22 +240,18 @@ const PaymentConfirmation = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl">Confirm Purchase</DialogTitle>
-                        <DialogDescription className="text-lg">
-                            Are you sure you want to purchase {selectedSeats.length} ticket{selectedSeats.length > 1 ? 's' : ''} for "{movieDetails.movietitle}"?
-                            <br />
-                            <br />
-                            <strong>Total: ₱{total}</strong>
-                            <br />
-                            Seats: {selectedSeats.join(", ")}
+                        <DialogTitle className="text-2xl text-white">Confirm Purchase</DialogTitle>
+                        <DialogDescription className="text-lg text-gray-300 ">
+                            Are you sure you want to purchase {selectedSeats.length} ticket{selectedSeats.length > 1 ? 's' : ''} for {movieDetails.movietitle}?
+
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="gap-3">
+                    <DialogFooter className="flex flex-row justify-between">
                         <Button
                             variant="outline"
                             onClick={() => setIsDialogOpen(false)}
                             disabled={isLoading}
-                            className="text-lg px-6 py-2"
+                            className="text-lg px-6 py-2 text-white"
                         >
                             Cancel
                         </Button>
@@ -267,7 +266,7 @@ const PaymentConfirmation = () => {
                                     Processing...
                                 </>
                             ) : (
-                                'Confirm Purchase'
+                                'Confirm'
                             )}
                         </Button>
                     </DialogFooter>

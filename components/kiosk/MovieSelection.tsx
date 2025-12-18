@@ -50,6 +50,7 @@ const MovieSelection: React.FC<MovieSelectionProps> = ({
 
     return (
         <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-r from-[#1E1E2F] to-[#2A2A3D]">
+
             <Swiper
                 effect={"fade"}
                 onSwiper={handleSwiperInit}

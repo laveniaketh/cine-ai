@@ -189,5 +189,5 @@ export async function login(state: FormState, formData: FormData) {
 
 export async function logout() {
   await deleteSession();
-  redirect("/login/admin");
+  redirect("/login");
 }

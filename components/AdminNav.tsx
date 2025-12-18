@@ -41,7 +41,7 @@ const AdminNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const handleLogout = async () => {
-        const formData = new FormData();
+        // const formData = new FormData();
         await logout();
     };
 

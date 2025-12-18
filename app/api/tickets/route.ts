@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
       paymentAmount,
       paymentStatus,
       platform,
+      dayOfWeek,
+      weekNumber,
     } = body;
 
     // Validate required fields
@@ -25,7 +27,9 @@ export async function POST(req: NextRequest) {
       !seatsSelected ||
       !paymentAmount ||
       !paymentStatus ||
-      !platform
+      !platform ||
+      !dayOfWeek ||
+      !weekNumber
     ) {
       return NextResponse.json(
         { message: "Required fields are missing" },
@@ -71,14 +75,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if any of the selected seats are already reserved for this movie
+    // Check if any of the selected seats are already reserved for this movie, day, and week
     const existingReservations = await ReservedSeat.find({
       seatNumber: {
         $in: seatsSelected.map((seat: string) => seat.toUpperCase()),
       },
     }).populate({
       path: "ticket_id",
-      match: { movie_id: movie._id },
+      match: {
+        movie_id: movie._id,
+        dayOfWeek: dayOfWeek,
+        weekNumber: weekNumber,
+      },
     });
 
     const reservedSeats = existingReservations
@@ -104,6 +112,8 @@ export async function POST(req: NextRequest) {
       ticket_id: newTicketId,
       movie_id: movie._id,
       platform: platform.toLowerCase(),
+      dayOfWeek: dayOfWeek,
+      weekNumber: weekNumber,
     });
 
     // Create payment record

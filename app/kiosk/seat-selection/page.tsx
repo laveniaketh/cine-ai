@@ -1,7 +1,8 @@
 "use client";
-import React from 'react';
 import SeatSelection from '@/components/kiosk/SeatSelection';
+import { LoaderOne } from '@/components/ui/loader';
 import { useMovieSelectionStore } from '@/lib/store/movie-selection';
+import { Suspense } from 'react';
 
 const SeatSelectionPage = () => {
     const selectedMovie = useMovieSelectionStore((state) => state.selectedMovie);
@@ -13,7 +14,6 @@ const SeatSelectionPage = () => {
             </div>
         );
     }
-
     const movieDetails = {
         id: selectedMovie._id,
         movietitle: selectedMovie.movieTitle,
@@ -25,10 +25,14 @@ const SeatSelectionPage = () => {
             <h1 className="text-6xl  text-gray-900 dark:text-white text-center">
                 <span className="text-gradient">Select</span> Your Seat
             </h1>
+            <Suspense fallback={<LoaderOne />}>
+                <SeatSelection
+                    movieDetails={movieDetails}
+                />
 
-            <SeatSelection
-                movieDetails={movieDetails}
-            />
+            </Suspense>
+
+
 
         </div>
     );

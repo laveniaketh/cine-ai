@@ -1,4 +1,6 @@
 import BentoDashboard from "@/components/dashboard/BentoDashboard"
+import { LoaderOne } from "@/components/ui/loader"
+import { Suspense } from "react"
 
 const Dashboard = () => {
     return (
@@ -7,7 +9,10 @@ const Dashboard = () => {
                 <h1 className="text-2xl font-bold text-white">Overview</h1>
                 <p className="text-gray-400">Track  cinema&apos;s performance with real-time analytics and insights</p>
             </div>
-            <BentoDashboard />
+            <Suspense fallback={<LoaderOne />}>
+                <BentoDashboard />
+            </Suspense>
+
         </div>
     )
 }

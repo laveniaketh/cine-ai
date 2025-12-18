@@ -277,13 +277,152 @@ const Tickets = () => {
                         <h1 className="text-2xl font-bold text-white">Ticket Orders</h1>
                         <p className="text-gray-400">Manage and track all ticket orders</p>
                     </div>
+                    <div className="text-sm text-gray-400 animate-pulse">
+                        Loading...
+                    </div>
                 </div>
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-                </div>
+
+                {/* Tabs */}
+                <Tabs value="all" className="w-full">
+                    <TabsList className="dark:bg-neutral-800 border">
+                        <TabsTrigger value="all" className="data-[state=active]:bg-neutral-900 text-white animate-pulse">
+                            All Orders (-)
+                        </TabsTrigger>
+                        <TabsTrigger value="kiosk" className="text-white animate-pulse" disabled>
+                            Kiosk Orders (-)
+                        </TabsTrigger>
+                        <TabsTrigger value="website" className="text-white animate-pulse" disabled>
+                            Website Orders (-)
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all" className="mt-4 space-y-6">
+                        {/* Search and Filter Bar */}
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between dark:bg-neutral-800 p-4 rounded-lg border">
+                            <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                                <div className="relative flex-1 max-w-sm">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                    <Input
+                                        placeholder="Search by Ticket ID or Seat..."
+                                        value=""
+                                        disabled
+                                        className="pl-9 bg-neutral-800 border-neutral-700 text-white placeholder-gray-400 animate-pulse"
+                                    />
+                                </div>
+                                <Select disabled>
+                                    <SelectTrigger className="w-40 bg-neutral-800 border-neutral-700 text-white animate-pulse">
+                                        <Filter className="h-4 w-4 mr-2" />
+                                        <SelectValue placeholder="Filter by Status" />
+                                    </SelectTrigger>
+                                </Select>
+                            </div>
+                            <div className="flex gap-2">
+                                <Select disabled>
+                                    <SelectTrigger className="w-40 bg-neutral-800 border-neutral-700 text-white animate-pulse">
+                                        <ArrowUpDown className="h-4 w-4 mr-2" />
+                                        <SelectValue placeholder="Date" />
+                                    </SelectTrigger>
+                                </Select>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled
+                                    className="bg-neutral-800 border-neutral-700 text-white animate-pulse"
+                                >
+                                    ↓
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="dark:bg-neutral-800 rounded-lg border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="border-neutral-800">
+                                        <TableHead className="text-white font-semibold">#</TableHead>
+                                        <TableHead className="text-white font-semibold">Ticket ID</TableHead>
+                                        <TableHead className="text-white font-semibold">Seat(s)</TableHead>
+                                        <TableHead className="text-white font-semibold">Date</TableHead>
+                                        <TableHead className="text-white font-semibold">Time</TableHead>
+                                        <TableHead className="text-white font-semibold">Qty</TableHead>
+                                        <TableHead className="text-white font-semibold">Platform</TableHead>
+                                        <TableHead className="text-white font-semibold">Payment Method</TableHead>
+                                        <TableHead className="text-white font-semibold">Timer</TableHead>
+                                        <TableHead className="text-white font-semibold">Total Payment</TableHead>
+                                        <TableHead className="text-white font-semibold">Payment Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from({ length: 8 }).map((_, index) => (
+                                        <TableRow key={index} className="border-neutral-700">
+                                            <TableCell className="text-gray-300">
+                                                <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-4 w-20 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1">
+                                                    <div className="h-6 w-12 bg-neutral-700 rounded animate-pulse"></div>
+                                                    <div className="h-6 w-12 bg-neutral-700 rounded animate-pulse"></div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-4 w-24 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-4 w-16 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-4 w-6 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-6 w-16 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-6 w-16 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-4 w-8 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-4 w-20 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="h-6 w-16 bg-neutral-700 rounded animate-pulse"></div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        {/* Pagination */}
+                        <div className="flex items-center justify-between dark:text-white">
+                            <div className="text-sm dark:text-white animate-pulse">
+                                Loading...
+                            </div>
+                            <Pagination>
+                                <PaginationContent>
+                                    <PaginationItem>
+                                        <PaginationPrevious className="pointer-events-none opacity-50" />
+                                    </PaginationItem>
+                                    <PaginationItem>
+                                        <PaginationLink isActive className="animate-pulse">1</PaginationLink>
+                                    </PaginationItem>
+                                    <PaginationItem>
+                                        <PaginationNext className="pointer-events-none opacity-50" />
+                                    </PaginationItem>
+                                </PaginationContent>
+                            </Pagination>
+                        </div>
+                    </TabsContent>
+                </Tabs>
             </div>
         )
     }
+
+
 
     return (
         <div className="p-4 space-y-6">

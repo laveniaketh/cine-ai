@@ -7,6 +7,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { LoaderOne } from "../ui/loader";
 
 const SeatMapSkeleton = () => {
     const [movies, setMovies] = useState<any[]>([]);
@@ -109,7 +110,7 @@ const SeatMapSkeleton = () => {
     if (loading) {
         return (
             <div className="relative w-full h-full flex items-center justify-center">
-                <div className="text-white text-sm">Loading...</div>
+                <LoaderOne />
             </div>
         );
     }
