@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
+import { LoaderOne } from "../ui/loader";
 
 const NowShowingSkeleton = () => {
     const [movies, setMovies] = useState<any[]>([]);
@@ -50,10 +51,13 @@ const NowShowingSkeleton = () => {
 
     if (loading) {
         return (
-            <div className="flex flex-1 w-full h-full min-h-[6rem] dark:bg-dot-white/[0.2] bg-dot-black/[0.2] flex-row space-x-3 p-3">
-                <div className="h-full w-1/3 rounded-2xl bg-neutral-700 animate-pulse" />
-                <div className="h-full w-1/3 rounded-2xl bg-neutral-700 animate-pulse" />
-                <div className="h-full w-1/3 rounded-2xl bg-neutral-700 animate-pulse" />
+            // <div className="flex flex-1 w-full h-full min-h-24 dark:bg-dot-white/[0.2] bg-dot-black/[0.2] flex-row space-x-3 p-3">
+            //     <div className="h-full w-1/3 rounded-2xl bg-neutral-700 animate-pulse" />
+            //     <div className="h-full w-1/3 rounded-2xl bg-neutral-700 animate-pulse" />
+            //     <div className="h-full w-1/3 rounded-2xl bg-neutral-700 animate-pulse" />
+            // </div>
+            <div className="relative w-full h-full flex items-center justify-center">
+                <LoaderOne />
             </div>
         );
     }

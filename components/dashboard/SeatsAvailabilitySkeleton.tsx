@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { LoaderOne } from "../ui/loader";
 
 const SeatsAvailabilitySkeleton = () => {
     const [seatData, setSeatData] = useState<any>(null);
@@ -23,8 +24,8 @@ const SeatsAvailabilitySkeleton = () => {
 
     if (loading || !seatData) {
         return (
-            <div className="flex flex-1 w-full h-full min-h-[6rem] items-center justify-center">
-                <div className="text-white text-sm">Loading seat availability...</div>
+            <div className="relative w-full h-full flex items-center justify-center">
+                <LoaderOne />
             </div>
         );
     }

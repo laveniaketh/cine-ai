@@ -8,6 +8,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button";
+import { LoaderOne } from "../ui/loader";
 
 const lineChartOptions = {
     responsive: true,
@@ -109,12 +110,12 @@ const SalesAnalyticsSkeleton = () => {
             try {
                 const response = await fetch('/api/analytics/sales');
                 const data = await response.json();
-                console.log('Sales data received:', data);
-                console.log('AI Prediction:', data.aiPrediction);
+                // console.log('Sales data received:', data);
+                // console.log('AI Prediction:', data.aiPrediction);
                 setSalesData(data);
                 setLoading(false);
             } catch (error) {
-                console.error('Error fetching sales data:', error);
+                // console.error('Error fetching sales data:', error);
                 setLoading(false);
             }
         };
@@ -124,8 +125,8 @@ const SalesAnalyticsSkeleton = () => {
 
     if (loading || !salesData) {
         return (
-            <div className="flex flex-1 w-full h-full min-h-[6rem] items-center justify-center">
-                <div className="text-white text-sm">Loading sales data...</div>
+            <div className="relative w-full h-full flex items-center justify-center">
+                <LoaderOne />
             </div>
         );
     }

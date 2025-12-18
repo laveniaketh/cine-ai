@@ -27,10 +27,10 @@ export async function GET(req: NextRequest) {
     const aiPrediction = generateAIPrediction(dailyData, weeklyData);
 
     // Debug logging
-    console.log("Current week number:", currentWeekNumber);
-    console.log("Daily data:", dailyData);
-    console.log("Weekly data:", weeklyData);
-    console.log("AI Prediction:", aiPrediction);
+    // console.log("Current week number:", currentWeekNumber);
+    // console.log("Daily data:", dailyData);
+    // console.log("Weekly data:", weeklyData);
+    // console.log("AI Prediction:", aiPrediction);
 
     // Calculate totals
     const totalTickets = dailyData.reduce((sum, d) => sum + d.tickets, 0);
