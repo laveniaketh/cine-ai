@@ -6,7 +6,7 @@ import "swiper/css";
 import "swiper/css/effect-coverflow";
 import { EffectCoverflow, Controller } from "swiper/modules";
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMovieSelectionStore } from "@/lib/store/movie-selection";
 
 interface Movie {
@@ -34,7 +34,11 @@ const PosterCarousel: React.FC<PosterCarouselProps> = ({
     swiperInstance,
     onMovieSelect
 }) => {
+    const router = useRouter();
     const setSelectedMovie = useMovieSelectionStore((state) => state.setSelectedMovie);
+    const clearSelection = useMovieSelectionStore((state) => state.clearSelection);
+
+
 
     const handleSwiperInit = (swiper: SwiperType) => {
         if (setSwiperInstance) {
@@ -42,7 +46,10 @@ const PosterCarousel: React.FC<PosterCarouselProps> = ({
         }
     };
 
-    const handleMovieClick = (movie: Movie) => {
+    const handleMovieClick = (movie: Movie, e: React.MouseEvent) => {
+        // Prevent default to avoid any conflicts
+        e.preventDefault();
+
         // Transform movie data to match store interface
         const storeMovie = {
             _id: movie.id.toString(),
@@ -55,14 +62,22 @@ const PosterCarousel: React.FC<PosterCarouselProps> = ({
             summary: movie.summary,
             timeslot: movie.timeslot,
         };
+
         setSelectedMovie(storeMovie);
+
         if (onMovieSelect) {
             onMovieSelect(movie);
         }
+
+        // Navigate programmatically
+        router.push('/kiosk/seat-selection');
     };
+
+
 
     return (
         <div className="w-120 px-6 py-10 mx-auto">
+
             <Swiper
                 effect={"coverflow"}
                 grabCursor={true}
@@ -78,22 +93,31 @@ const PosterCarousel: React.FC<PosterCarouselProps> = ({
                 controller={{ control: swiperInstance }}
                 modules={[EffectCoverflow, Controller]}
                 className="h-72"
+                // KEY FIX: Allow click events to pass through
+                allowTouchMove={true}
+                // Prevent swiper from blocking clicks
+                touchStartPreventDefault={false}
             >
                 {movies.map((movie) => (
                     <SwiperSlide
                         key={movie.id}
                         className="w-48! h-72! flex justify-center items-center"
                     >
-
-                        <Link href="/kiosk/seat-selection" className="cursor-pointer" onClick={() => handleMovieClick(movie)}>
+                        {/* Replace Link with div + onClick */}
+                        <div
+                            onClick={(e) => handleMovieClick(movie, e)}
+                            className="cursor-pointer"
+                        >
                             <Image
                                 src={movie.posterPath}
                                 alt={movie.movietitle}
                                 width={192}
                                 height={288}
                                 className="w-48 h-72 rounded-md object-cover border-4 border-white shadow-md shadow-[#2D2D2F]"
+                                // Prevent image drag interfering with clicks
+                                draggable={false}
                             />
-                        </Link>
+                        </div>
                     </SwiperSlide>
                 ))}
             </Swiper>

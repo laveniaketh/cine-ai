@@ -1,10 +1,11 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useMovieSelectionStore } from "@/lib/store/movie-selection";
+import { LoaderOne } from "../ui/loader";
 
 interface MovieDetails {
     id: string;
@@ -16,9 +17,7 @@ interface SeatSelectionProps {
     movieDetails: MovieDetails;
 }
 
-const SeatSelection: React.FC<SeatSelectionProps> = ({
-    movieDetails
-}) => {
+const SeatSelection: React.FC<SeatSelectionProps> = ({ movieDetails }) => {
     const selectedSeatsFromStore = useMovieSelectionStore((state) => state.selectedSeats);
     const setSelectedSeats = useMovieSelectionStore((state) => state.setSelectedSeats);
 
@@ -30,6 +29,8 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
     const [reservedSeats, setReservedSeats] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedSeats, setSelectedSeatsLocal] = useState<string[]>(selectedSeatsFromStore);
+    const clearSelection = useMovieSelectionStore((state) => state.clearSelection);
+
 
     // Fetch reserved seats from backend
     useEffect(() => {
@@ -117,17 +118,6 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
         return `${hour}:${minute} ${ampm}`;
     };
 
-    if (loading) {
-        return (
-            <div className="flex flex-col gap-2">
-                <div className="rounded-lg shadow-lg border-neutral-700 bg-neutral-800 mt-4 mx-auto p-12">
-                    <div className="flex items-center justify-center h-full text-white">
-                        Loading seat information...
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="flex flex-col gap-2">
@@ -148,7 +138,9 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                         <div className="w-150 h-8 bg-[#171718] rounded-lg text-white text-lg font-bold flex items-center justify-center mb-4">
                             Screen
                         </div>
-                        <div className="flex flex-col gap-y-2">
+                        {(loading) ? (
+                            <LoaderOne />
+                        ) : (<div className="flex flex-col gap-y-2">
                             {rows.map((row, rowIndex) => (
                                 <div key={row} className="flex justify-center gap-x-3">
                                     {Array.from({ length: seatsPerRow[rowIndex] }, (_, i) => {
@@ -169,6 +161,8 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                                 </div>
                             ))}
                         </div>
+                        )}
+
                     </div>
                 </div>
             </div >
@@ -196,7 +190,10 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({
                 </div>
             </div>
             <div className="flex gap-2 justify-between">
-                <Link href="/kiosk/movie-selection">
+                <Link
+                    href="/kiosk/movie-selection"
+                    onClick={() => setSelectedSeats([])}
+                >
                     <Button className="text-2xl px-8 py-2 h-auto rounded-xl">Back</Button>
                 </Link>
                 {selectedSeats.length === 0 ? (
