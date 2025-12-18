@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { vapi } from "@/lib/vapi.sdk";
 import { MessageCircle, Mic, MicOff, X } from "lucide-react";
@@ -15,7 +15,11 @@ export default function Agent({ movieData }: AgentProps) {
     const [isNavigationActive, setIsNavigationActive] = useState(true);
     const [isChatbotActive, setIsChatbotActive] = useState(false);
     const [conversationState, setConversationState] = useState<string>("");
-    const [lastStep, setLastStep] = useState<string>("");
+    const [isNavigationSpeaking, setIsNavigationSpeaking] = useState(false);
+
+    const lastStepRef = useRef<string>("");
+    const navigationCallIdRef = useRef<string | null>(null);
+    const isMountedRef = useRef(true);
 
     // Map routes to navigation steps
     const getStepFromPath = (path: string): string | null => {
@@ -36,26 +40,31 @@ export default function Agent({ movieData }: AgentProps) {
         "payment-successful": "Thank you for your booking! Your tickets have been confirmed. Enjoy your movie!"
     };
 
-    // Start navigation assistant
+    // Start navigation assistant with improved timing
     const startNavigationAssistant = useCallback(async (step: string) => {
-        if (!isNavigationActive || !step || step === lastStep) return;
+        if (!isNavigationActive || !step || lastStepRef.current === step || isNavigationSpeaking) {
+            return;
+        }
 
         try {
-            // Stop any existing call
-            try {
-                vapi.stop();
-            } catch (e) {
-                // Ignore if no call is active
+            // Stop any existing navigation call
+            if (navigationCallIdRef.current) {
+                try {
+                    vapi.stop();
+                } catch (e) {
+                    // Ignore
+                }
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
-
-            // Reduced delay for faster response (was 300ms)
-            // await new Promise(resolve => setTimeout(resolve, 300));
 
             const message = navigationMessages[step];
             if (!message) return;
 
+            lastStepRef.current = step;
+            setIsNavigationSpeaking(true);
+
             // Start a new call with navigation instructions
-            await vapi.start({
+            const callPromise = vapi.start({
                 transcriber: {
                     provider: "deepgram",
                     model: "nova-2",
@@ -67,40 +76,51 @@ export default function Agent({ movieData }: AgentProps) {
                     messages: [
                         {
                             role: "system",
-                            content: `You are a cinema kiosk navigation assistant. Your role is to provide brief, clear instructions only. 
-              Say: "${message}"
-              After delivering this message, do not engage in conversation. If the user speaks, say: "For questions, please use the chatbot button on your screen."`
+                            content: `You are a cinema kiosk navigation assistant. 
+                            Say ONLY this exact message: "${message}"
+                            Do not add anything else. Do not engage in conversation.`
                         }
                     ],
-                    temperature: 0.7
+                    temperature: 0.3,
+                    maxTokens: 100
                 },
                 voice: {
                     provider: "11labs",
-                    voiceId: "21m00Tcm4TlvDq8ikWAM"
+                    voiceId: "21m00Tcm4TlvDq8ikWAM",
+                    stability: 0.8,
+                    similarityBoost: 0.75
                 },
                 firstMessage: message,
-                endCallFunctionEnabled: false
+                endCallFunctionEnabled: false,
+                silenceTimeoutSeconds: 5,
+                endCallPhrases: []
             });
 
-            setLastStep(step);
+            navigationCallIdRef.current = step;
+            await callPromise;
 
-            // Auto-stop after message delivery
-            setTimeout(() => {
+        } catch (error) {
+            console.error("Navigation assistant error:", error);
+            setIsNavigationSpeaking(false);
+            navigationCallIdRef.current = null;
+        }
+    }, [isNavigationActive, isNavigationSpeaking]);
+
+    // Start chatbot assistant with Gemini integration
+    const startChatbot = async () => {
+        try {
+            // Stop navigation if speaking
+            if (isNavigationSpeaking) {
                 try {
                     vapi.stop();
                 } catch (e) {
                     // Ignore
                 }
-            }, 6000);
+                setIsNavigationSpeaking(false);
+                navigationCallIdRef.current = null;
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
 
-        } catch (error) {
-            console.error("Navigation assistant error:", error);
-        }
-    }, [isNavigationActive, lastStep]);
-
-    // Start chatbot assistant with Gemini integration
-    const startChatbot = async () => {
-        try {
             setIsChatbotActive(true);
 
             await vapi.start({
@@ -171,14 +191,15 @@ export default function Agent({ movieData }: AgentProps) {
         setConversationState("");
     };
 
-    // Listen for function calls from Vapi
+    // Listen for Vapi events
     useEffect(() => {
+        isMountedRef.current = true;
+
         const handleFunctionCall = async (functionCall: any) => {
             if (functionCall.function.name === "get_cinema_info") {
                 const query = functionCall.function.arguments.query;
 
                 try {
-                    // Call our API to get Gemini response
                     const response = await fetch("/api/vapi/generate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -190,7 +211,6 @@ export default function Agent({ movieData }: AgentProps) {
 
                     const data = await response.json();
 
-                    // Send result back to Vapi
                     vapi.send({
                         type: "function-result",
                         functionCallId: functionCall.id,
@@ -207,28 +227,51 @@ export default function Agent({ movieData }: AgentProps) {
             }
         };
 
+        const handleCallEnd = () => {
+            console.log("Call ended");
+            if (isMountedRef.current) {
+                setIsChatbotActive(false);
+                setIsNavigationSpeaking(false);
+                navigationCallIdRef.current = null;
+            }
+        };
+
+        const handleSpeechEnd = () => {
+            console.log("Speech ended");
+            // Mark navigation as complete after speech ends
+            if (navigationCallIdRef.current && isMountedRef.current) {
+                setTimeout(() => {
+                    setIsNavigationSpeaking(false);
+                }, 500);
+            }
+        };
+
         vapi.on("call-start", () => {
             console.log("Call started");
         });
 
-        vapi.on("call-end", () => {
-            console.log("Call ended");
-            setIsChatbotActive(false);
-        });
-
+        vapi.on("call-end", handleCallEnd);
+        vapi.on("speech-end", handleSpeechEnd);
         vapi.on("function-call", handleFunctionCall);
 
         vapi.on("message", (message: any) => {
             if (message.type === "transcript" && message.role === "user") {
-                setConversationState(message.transcript);
+                if (isMountedRef.current) {
+                    setConversationState(message.transcript);
+                }
             }
         });
 
         vapi.on("error", (error: any) => {
             console.error("Vapi error:", error);
+            if (isMountedRef.current) {
+                setIsNavigationSpeaking(false);
+                navigationCallIdRef.current = null;
+            }
         });
 
         return () => {
+            isMountedRef.current = false;
             vapi.removeAllListeners();
         };
     }, [movieData]);
@@ -236,11 +279,14 @@ export default function Agent({ movieData }: AgentProps) {
     // Trigger navigation assistant on route change
     useEffect(() => {
         const currentStep = getStepFromPath(pathname);
-        if (currentStep && isNavigationActive) {
-            // Remove or reduce delay for faster navigation message
-            startNavigationAssistant(currentStep);
+        if (currentStep && isNavigationActive && !isChatbotActive) {
+            // Quick start for immediate response
+            const timer = setTimeout(() => {
+                startNavigationAssistant(currentStep);
+            }, 150);
+            return () => clearTimeout(timer);
         }
-    }, [pathname, isNavigationActive, startNavigationAssistant]);
+    }, [pathname, isNavigationActive, isChatbotActive, startNavigationAssistant]);
 
     // Don't show on non-kiosk pages
     if (!pathname.includes("/kiosk")) {
@@ -259,7 +305,7 @@ export default function Agent({ movieData }: AgentProps) {
                         startChatbot();
                     }
                 }}
-                className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-full p-5 shadow-2xl transition-all duration-300 hover:scale-110 animate-pulse-slow"
+                className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-full p-5 shadow-2xl transition-all duration-300 hover:scale-110"
                 aria-label="Toggle voice assistant"
             >
                 {isChatbotActive ? (
@@ -345,8 +391,10 @@ export default function Agent({ movieData }: AgentProps) {
             {/* Navigation Assistant Status Indicator */}
             {isNavigationActive && (
                 <div className="fixed top-6 right-6 z-40 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-3 rounded-full shadow-xl text-sm flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></div>
-                    <span className="font-medium">Voice Guide Active</span>
+                    <div className={`w-2.5 h-2.5 rounded-full ${isNavigationSpeaking ? 'bg-green-400 animate-pulse' : 'bg-blue-400'}`}></div>
+                    <span className="font-medium">
+                        {isNavigationSpeaking ? "Speaking..." : "Voice Guide Ready"}
+                    </span>
                 </div>
             )}
         </>

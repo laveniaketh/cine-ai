@@ -2,8 +2,6 @@
 
 import Agent from "@/components/Agent";
 import { useMovieSelectionStore } from "@/lib/store/movie-selection";
-import { Suspense } from "react";
-import Loading from "./dggsga";
 
 const KioskLayout = ({ children }: { children: React.ReactNode }) => {
     const selectedMovie = useMovieSelectionStore((state) => state.selectedMovie);
@@ -28,7 +26,7 @@ const KioskLayout = ({ children }: { children: React.ReactNode }) => {
         <div >
 
             {children}
-            {/* <Agent movieData={movieData} /> */}
+            <Agent movieData={movieData} />
         </div >
     );
 };

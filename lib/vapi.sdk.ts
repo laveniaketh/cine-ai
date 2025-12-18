@@ -1,12 +1,19 @@
 import Vapi from "@vapi-ai/web";
 
+// Validate token exists
+if (!process.env.NEXT_PUBLIC_VAPI_WEB_TOKEN) {
+  console.error(
+    "❌ NEXT_PUBLIC_VAPI_WEB_TOKEN is not set in environment variables"
+  );
+}
+
 // Initialize Vapi with your token
 export const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_WEB_TOKEN!);
 
 // Helper function to check if Vapi is initialized
 export const isVapiReady = (): boolean => {
   try {
-    return !!vapi;
+    return !!vapi && !!process.env.NEXT_PUBLIC_VAPI_WEB_TOKEN;
   } catch (error) {
     console.error("Vapi not ready:", error);
     return false;
@@ -40,7 +47,7 @@ export const VapiConfigs = {
     },
     voice: {
       provider: "11labs" as const,
-      voiceId: "21m00Tcm4TlvDq8ikWAM", // Rachel - Friendly, conversational
+      voiceId: "21m00Tcm4TlvDq8ikWAM",
       stability: 0.7,
       similarityBoost: 0.8,
     },

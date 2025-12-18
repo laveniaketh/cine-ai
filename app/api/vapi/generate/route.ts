@@ -48,7 +48,7 @@ CURRENT USER SELECTION:
 GENERAL CINEMA INFORMATION:
 
 TICKET PRICING:
-- Standard Seats: ₱200 per seat
+- Standard Seats: 200 Pesos per seat
 - All seats are the same price
 - Payment accepted: Cash
 
