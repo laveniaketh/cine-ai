@@ -1,13 +1,14 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
+import Countdown from '@/components/kiosk/Countdown'
 
 const Hero = () => {
     return (
         <div className="flex flex-col relative items-center mx-auto my-auto justify-center ">
             <div className='flex flex-col items-center justify-center text-center relative'>
                 {/* Banner positioned behind the CineAI logo */}
-                <div className="absolute top-30 left-1/2 -translate-x-1/2 -z-10 scale-[3.5]">
+                <div className="absolute top-70 left-1/2 -translate-x-1/2 -z-10 scale-[3.5]">
                     <Image
                         src="/banner2.png"
                         alt="Hero Banner"
@@ -17,7 +18,7 @@ const Hero = () => {
                     />
                 </div>
 
-                <div className='flex items-center justify-center mt-50 '>
+                <div className='flex items-center justify-center mt-90 '>
                     <h1 className='text-gradient text-center text-[200px] font-extrabold font-figtree '>Cine<span
                         className='text-white mr-2'>Al</span></h1>
                     <Image src="/big-logo.png" alt="CineAI Logo" width={150} height={150} className="rotate-10" />
