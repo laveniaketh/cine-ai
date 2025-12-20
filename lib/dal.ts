@@ -9,7 +9,7 @@ export const verifySession = cache(async () => {
   const session = await decrypt(cookie);
 
   if (!session?.adminId) {
-    redirect("/login/admin");
+    redirect("/login");
   }
 
   return {

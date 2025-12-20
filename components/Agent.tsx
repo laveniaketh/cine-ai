@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { vapi } from "@/lib/vapi.sdk";
-import { MessageCircle, Mic, MicOff, X } from "lucide-react";
+import { MessageCircle, Mic, MicOff, X, Volume2, AlertCircle } from "lucide-react";
 
 interface AgentProps {
     movieData?: any;
@@ -16,12 +16,31 @@ export default function Agent({ movieData }: AgentProps) {
     const [isChatbotActive, setIsChatbotActive] = useState(false);
     const [conversationState, setConversationState] = useState<string>("");
     const [isNavigationSpeaking, setIsNavigationSpeaking] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string>("");
+    const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
     const lastStepRef = useRef<string>("");
     const navigationCallIdRef = useRef<string | null>(null);
     const isMountedRef = useRef(true);
+    const isStartingCallRef = useRef(false);
 
-    // Map routes to navigation steps
+    // Add debug log
+    const addDebugLog = (message: string) => {
+        console.log(`[DEBUG] ${message}`);
+        setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`]);
+    };
+
+    // Check Vapi configuration on mount
+    useEffect(() => {
+        const token = process.env.NEXT_PUBLIC_VAPI_WEB_TOKEN;
+        if (!token) {
+            setErrorMessage("⚠️ VAPI TOKEN IS MISSING! Check your .env.local file.");
+            addDebugLog("ERROR: No Vapi token found");
+        } else {
+            addDebugLog(`Vapi token found: ${token.substring(0, 10)}...`);
+        }
+    }, []);
+
     const getStepFromPath = (path: string): string | null => {
         if (path.includes("/kiosk/movie-selection")) return "movie-selection";
         if (path.includes("/kiosk/seat-selection")) return "seat-selection";
@@ -31,40 +50,61 @@ export default function Agent({ movieData }: AgentProps) {
         return null;
     };
 
-    // Navigation messages for each step
     const navigationMessages: Record<string, string> = {
-        "welcome": "Welcome to CineAI! Please select Buy Ticket to start booking your movie.",
-        "movie-selection": "Please select a movie from the available options on screen.",
+        "welcome": "Welcome to CineAI! Please tap Buy Ticket to start booking your movie.",
+        "movie-selection": "Please select a movie. Swipe left or right to browse, then tap the poster to select.",
         "seat-selection": "Great choice! Now please choose your preferred seats from the seating chart.",
-        "payment-confirmation": "Perfect! Here is your total payment. Please review and confirm your booking.",
+        "payment-confirmation": "Perfect! Here is your total payment. Please review and tap confirm to complete your booking.",
         "payment-successful": "Thank you for your booking! Your tickets have been confirmed. Enjoy your movie!"
     };
 
-    // Start navigation assistant with improved timing
     const startNavigationAssistant = useCallback(async (step: string) => {
-        if (!isNavigationActive || !step || lastStepRef.current === step || isNavigationSpeaking) {
+        if (isStartingCallRef.current) {
+            addDebugLog(`Skipping - call already starting`);
             return;
         }
 
+        if (!isNavigationActive || !step) {
+            addDebugLog(`Skipping - navigation inactive or no step`);
+            return;
+        }
+
+        // FIXED: Check if this is the same step AND we haven't changed routes
+        if (lastStepRef.current === step && navigationCallIdRef.current === step) {
+            addDebugLog(`Skipping - same step already played`);
+            return;
+        }
+
+        isStartingCallRef.current = true;
+        addDebugLog(`Starting navigation for step: ${step}`);
+
         try {
-            // Stop any existing navigation call
-            if (navigationCallIdRef.current) {
+            // Stop any existing call
+            if (navigationCallIdRef.current && navigationCallIdRef.current !== step) {
+                addDebugLog("Stopping previous call");
                 try {
-                    vapi.stop();
+                    await vapi.stop();
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 } catch (e) {
-                    // Ignore
+                    addDebugLog("No previous call to stop");
                 }
-                await new Promise(resolve => setTimeout(resolve, 100));
             }
 
             const message = navigationMessages[step];
-            if (!message) return;
+            if (!message) {
+                addDebugLog("ERROR: No message for step");
+                isStartingCallRef.current = false;
+                return;
+            }
 
             lastStepRef.current = step;
             setIsNavigationSpeaking(true);
+            setErrorMessage("");
 
-            // Start a new call with navigation instructions
-            const callPromise = vapi.start({
+            addDebugLog(`Calling vapi.start()...`);
+
+            // Simplified configuration for testing
+            await vapi.start({
                 transcriber: {
                     provider: "deepgram",
                     model: "nova-2",
@@ -76,52 +116,64 @@ export default function Agent({ movieData }: AgentProps) {
                     messages: [
                         {
                             role: "system",
-                            content: `You are a cinema kiosk navigation assistant. 
-                            Say ONLY this exact message: "${message}"
-                            Do not add anything else. Do not engage in conversation.`
+                            content: `Say: "${message}"`
                         }
-                    ],
-                    temperature: 0.3,
-                    maxTokens: 100
+                    ]
                 },
                 voice: {
                     provider: "11labs",
-                    voiceId: "21m00Tcm4TlvDq8ikWAM",
-                    stability: 0.8,
-                    similarityBoost: 0.75
+                    voiceId: "21m00Tcm4TlvDq8ikWAM"
                 },
-                firstMessage: message,
-                endCallFunctionEnabled: false,
-                silenceTimeoutSeconds: 5,
-                endCallPhrases: []
+                firstMessage: message
             });
 
             navigationCallIdRef.current = step;
-            await callPromise;
+            addDebugLog("✅ Navigation started successfully");
 
-        } catch (error) {
-            console.error("Navigation assistant error:", error);
+        } catch (error: any) {
+            const errorDetails = {
+                message: error?.message,
+                code: error?.code,
+                status: error?.status,
+                full: JSON.stringify(error, null, 2)
+            };
+
+            addDebugLog(`❌ ERROR: ${JSON.stringify(errorDetails)}`);
+            console.error("Full error object:", error);
+
+            setErrorMessage(`Navigation failed: ${error?.message || "Unknown error"}`);
             setIsNavigationSpeaking(false);
             navigationCallIdRef.current = null;
+        } finally {
+            isStartingCallRef.current = false;
         }
-    }, [isNavigationActive, isNavigationSpeaking]);
+    }, [isNavigationActive]);
 
-    // Start chatbot assistant with Gemini integration
     const startChatbot = async () => {
+        if (isStartingCallRef.current) {
+            addDebugLog("Chatbot - call already starting");
+            return;
+        }
+
+        isStartingCallRef.current = true;
+        addDebugLog("Starting chatbot");
+
         try {
-            // Stop navigation if speaking
+            // Stop navigation if active
             if (isNavigationSpeaking) {
+                addDebugLog("Stopping navigation for chatbot");
                 try {
-                    vapi.stop();
+                    await vapi.stop();
                 } catch (e) {
-                    // Ignore
+                    addDebugLog("No navigation to stop");
                 }
                 setIsNavigationSpeaking(false);
                 navigationCallIdRef.current = null;
-                await new Promise(resolve => setTimeout(resolve, 200));
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
 
             setIsChatbotActive(true);
+            setErrorMessage("");
 
             await vapi.start({
                 transcriber: {
@@ -135,14 +187,11 @@ export default function Agent({ movieData }: AgentProps) {
                     functions: [
                         {
                             name: "get_cinema_info",
-                            description: "Get information about movies, showtimes, prices, and cinema details",
+                            description: "Get cinema information",
                             parameters: {
                                 type: "object",
                                 properties: {
-                                    query: {
-                                        type: "string",
-                                        description: "The user's question"
-                                    }
+                                    query: { type: "string" }
                                 },
                                 required: ["query"]
                             }
@@ -151,44 +200,40 @@ export default function Agent({ movieData }: AgentProps) {
                     messages: [
                         {
                             role: "system",
-                            content: `You are a helpful CineAI cinema assistant. You can answer questions about:
-              - Available movies and their details
-              - Showtimes and schedules
-              - Ticket prices (Standard: ₱200 per seat)
-              - Seat availability
-              - How to use the kiosk
-              - General cinema information
-              
-              When users ask questions, use the get_cinema_info function to retrieve accurate information.
-              Be friendly, concise, and helpful. Keep responses under 30 seconds of speech.
-              For pricing, always mention that standard seats are ₱200 each.`
+                            content: "You are CineAI's assistant. Answer questions about movies, prices, and showtimes."
                         }
-                    ],
-                    temperature: 0.8
+                    ]
                 },
                 voice: {
                     provider: "11labs",
                     voiceId: "21m00Tcm4TlvDq8ikWAM"
                 },
-                firstMessage: "Hi! I'm your CineAI assistant. How can I help you today?",
-                endCallFunctionEnabled: false
+                firstMessage: "Hi! How can I help you today?"
             });
 
-        } catch (error) {
+            addDebugLog("✅ Chatbot started");
+
+        } catch (error: any) {
+            addDebugLog(`❌ Chatbot error: ${error?.message}`);
             console.error("Chatbot error:", error);
+            setErrorMessage(`Chatbot failed: ${error?.message || "Unknown error"}`);
             setIsChatbotActive(false);
+        } finally {
+            isStartingCallRef.current = false;
         }
     };
 
     const stopChatbot = () => {
+        addDebugLog("Stopping chatbot");
         try {
             vapi.stop();
         } catch (e) {
-            // Ignore
+            addDebugLog("No call to stop");
         }
         setIsChatbotActive(false);
         setIsChatbotOpen(false);
         setConversationState("");
+        isStartingCallRef.current = false;
     };
 
     // Listen for Vapi events
@@ -196,77 +241,60 @@ export default function Agent({ movieData }: AgentProps) {
         isMountedRef.current = true;
 
         const handleFunctionCall = async (functionCall: any) => {
+            addDebugLog(`Function call: ${functionCall.function.name}`);
             if (functionCall.function.name === "get_cinema_info") {
                 const query = functionCall.function.arguments.query;
-
                 try {
                     const response = await fetch("/api/vapi/generate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            query,
-                            movieData
-                        })
+                        body: JSON.stringify({ query, movieData })
                     });
-
                     const data = await response.json();
-
                     vapi.send({
                         type: "function-result",
                         functionCallId: functionCall.id,
-                        result: data.response || "I'm having trouble getting that information right now."
+                        result: data.response || "Error"
                     });
+                    addDebugLog("Function result sent");
                 } catch (error) {
-                    console.error("Function call error:", error);
-                    vapi.send({
-                        type: "function-result",
-                        functionCallId: functionCall.id,
-                        result: "I'm having trouble accessing that information right now. Please try asking again."
-                    });
+                    addDebugLog(`Function call error: ${error}`);
                 }
             }
         };
 
         const handleCallEnd = () => {
-            console.log("Call ended");
+            addDebugLog("📞 Call ended");
             if (isMountedRef.current) {
                 setIsChatbotActive(false);
                 setIsNavigationSpeaking(false);
                 navigationCallIdRef.current = null;
+                isStartingCallRef.current = false;
             }
         };
 
-        const handleSpeechEnd = () => {
-            console.log("Speech ended");
-            // Mark navigation as complete after speech ends
-            if (navigationCallIdRef.current && isMountedRef.current) {
-                setTimeout(() => {
-                    setIsNavigationSpeaking(false);
-                }, 500);
+        const handleError = (error: any) => {
+            const errorStr = JSON.stringify(error);
+            addDebugLog(`❌ Vapi error event: ${errorStr}`);
+            console.error("Vapi error event:", error);
+
+            if (isMountedRef.current) {
+                setErrorMessage(`Voice error: ${error?.message || errorStr || "Unknown"}`);
+                setIsNavigationSpeaking(false);
+                setIsChatbotActive(false);
+                navigationCallIdRef.current = null;
+                isStartingCallRef.current = false;
             }
         };
 
-        vapi.on("call-start", () => {
-            console.log("Call started");
-        });
-
+        vapi.on("call-start", () => addDebugLog("📞 Call started"));
         vapi.on("call-end", handleCallEnd);
-        vapi.on("speech-end", handleSpeechEnd);
+        vapi.on("speech-end", () => addDebugLog("🔇 Speech ended"));
         vapi.on("function-call", handleFunctionCall);
-
+        vapi.on("error", handleError);
         vapi.on("message", (message: any) => {
             if (message.type === "transcript" && message.role === "user") {
-                if (isMountedRef.current) {
-                    setConversationState(message.transcript);
-                }
-            }
-        });
-
-        vapi.on("error", (error: any) => {
-            console.error("Vapi error:", error);
-            if (isMountedRef.current) {
-                setIsNavigationSpeaking(false);
-                navigationCallIdRef.current = null;
+                setConversationState(message.transcript);
             }
         });
 
@@ -276,26 +304,57 @@ export default function Agent({ movieData }: AgentProps) {
         };
     }, [movieData]);
 
-    // Trigger navigation assistant on route change
+    // Trigger navigation on route change
     useEffect(() => {
         const currentStep = getStepFromPath(pathname);
-        if (currentStep && isNavigationActive && !isChatbotActive) {
-            // Quick start for immediate response
-            const timer = setTimeout(() => {
-                startNavigationAssistant(currentStep);
-            }, 150);
-            return () => clearTimeout(timer);
+        addDebugLog(`Route changed: ${pathname} -> step: ${currentStep}`);
+
+        // Reset last step when route actually changes (force new message)
+        if (currentStep && currentStep !== lastStepRef.current) {
+            addDebugLog(`New step detected, resetting state`);
+            lastStepRef.current = ""; // Clear to allow new message
+            navigationCallIdRef.current = null;
+            setIsNavigationSpeaking(false);
+        }
+
+        if (currentStep && isNavigationActive && !isChatbotActive && !isStartingCallRef.current) {
+            startNavigationAssistant(currentStep);
         }
     }, [pathname, isNavigationActive, isChatbotActive, startNavigationAssistant]);
 
-    // Don't show on non-kiosk pages
     if (!pathname.includes("/kiosk")) {
         return null;
     }
 
     return (
         <>
-            {/* Chatbot Toggle Button */}
+            {/* Debug Console */}
+            <div className="fixed top-20 left-6 z-[70] bg-black/90 text-green-400 p-3 rounded-lg text-xs font-mono max-w-md">
+                <div className="flex items-center gap-2 mb-2 text-white">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="font-bold">Debug Console</span>
+                </div>
+                {debugInfo.map((log, i) => (
+                    <div key={i} className="py-0.5">{log}</div>
+                ))}
+            </div>
+
+            {/* Error Display */}
+            {errorMessage && (
+                <div className="fixed top-20 right-6 z-[60] bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg max-w-md">
+                    <div className="flex items-start justify-between gap-2">
+                        <div>
+                            <p className="font-bold mb-1">Error Details:</p>
+                            <p className="text-sm">{errorMessage}</p>
+                        </div>
+                        <button onClick={() => setErrorMessage("")} className="text-white">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Chatbot Button */}
             <button
                 onClick={() => {
                     if (isChatbotOpen) {
@@ -305,19 +364,15 @@ export default function Agent({ movieData }: AgentProps) {
                         startChatbot();
                     }
                 }}
-                className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-full p-5 shadow-2xl transition-all duration-300 hover:scale-110"
-                aria-label="Toggle voice assistant"
+                className="fixed bottom-8 right-8 z-50 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-full p-6 shadow-2xl transition-all duration-300 hover:scale-110"
+                disabled={isStartingCallRef.current}
             >
-                {isChatbotActive ? (
-                    <MicOff className="w-7 h-7" />
-                ) : (
-                    <MessageCircle className="w-7 h-7" />
-                )}
+                {isChatbotActive ? <MicOff className="w-8 h-8" /> : <MessageCircle className="w-8 h-8" />}
             </button>
 
             {/* Chatbot Interface */}
             {isChatbotOpen && (
-                <div className="fixed bottom-28 right-6 z-50 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700 w-96 overflow-hidden">
+                <div className="fixed bottom-32 right-8 z-50 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700 w-96 overflow-hidden">
                     <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <Mic className="w-6 h-6" />
@@ -326,10 +381,7 @@ export default function Agent({ movieData }: AgentProps) {
                                 <p className="text-xs text-red-100">Voice-powered help</p>
                             </div>
                         </div>
-                        <button
-                            onClick={stopChatbot}
-                            className="hover:bg-red-800 rounded-full p-2 transition-colors"
-                        >
+                        <button onClick={stopChatbot} className="hover:bg-red-800 rounded-full p-2">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -341,35 +393,17 @@ export default function Agent({ movieData }: AgentProps) {
                                     <div className="absolute inset-0 bg-red-500 rounded-full opacity-20 animate-ping"></div>
                                     <Mic className="w-16 h-16 text-red-500 relative z-10" />
                                 </div>
-                                <p className="mt-4 text-white font-semibold text-lg text-center">
-                                    Listening...
-                                </p>
-                                <p className="text-sm text-gray-400 text-center mt-2">
-                                    Ask me anything about movies, times, or prices
-                                </p>
+                                <p className="mt-4 text-white font-semibold text-lg">Listening...</p>
                                 {conversationState && (
-                                    <div className="mt-4 bg-neutral-700 rounded-lg p-3 max-w-full">
-                                        <p className="text-sm text-gray-300 italic">
-                                            "{conversationState}"
-                                        </p>
+                                    <div className="mt-4 bg-neutral-700 rounded-lg p-3">
+                                        <p className="text-sm text-gray-300 italic">"{conversationState}"</p>
                                     </div>
                                 )}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center">
                                 <MessageCircle className="w-16 h-16 text-red-500 mb-4" />
-                                <p className="text-white font-semibold text-xl mb-2">
-                                    Voice Assistant Ready
-                                </p>
-                                <p className="text-gray-400 text-sm leading-relaxed px-4">
-                                    Ask me about:
-                                </p>
-                                <ul className="text-gray-300 text-sm mt-3 space-y-1 text-left">
-                                    <li>• Movie information</li>
-                                    <li>• Showtimes and schedules</li>
-                                    <li>• Ticket prices</li>
-                                    <li>• How to use the kiosk</li>
-                                </ul>
+                                <p className="text-white font-semibold text-xl mb-2">Voice Assistant Ready</p>
                             </div>
                         )}
                     </div>
@@ -377,24 +411,29 @@ export default function Agent({ movieData }: AgentProps) {
                     <div className="p-4 bg-neutral-900 border-t border-neutral-700">
                         <button
                             onClick={isChatbotActive ? stopChatbot : startChatbot}
-                            className={`w-full py-3 rounded-xl font-semibold transition-all text-lg ${isChatbotActive
-                                ? "bg-red-600 hover:bg-red-700 text-white"
-                                : "bg-neutral-700 hover:bg-neutral-600 text-white"
-                                }`}
+                            disabled={isStartingCallRef.current}
+                            className="w-full py-3 rounded-xl font-semibold text-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
                         >
-                            {isChatbotActive ? "End Conversation" : "Start Talking"}
+                            {isStartingCallRef.current ? "Starting..." : isChatbotActive ? "End" : "Start"}
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Navigation Assistant Status Indicator */}
+            {/* Status Indicator */}
             {isNavigationActive && (
                 <div className="fixed top-6 right-6 z-40 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-3 rounded-full shadow-xl text-sm flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isNavigationSpeaking ? 'bg-green-400 animate-pulse' : 'bg-blue-400'}`}></div>
-                    <span className="font-medium">
-                        {isNavigationSpeaking ? "Speaking..." : "Voice Guide Ready"}
-                    </span>
+                    {isNavigationSpeaking ? (
+                        <>
+                            <Volume2 className="w-4 h-4 animate-pulse" />
+                            <span>Speaking...</span>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-2.5 h-2.5 bg-blue-400 rounded-full"></div>
+                            <span>Ready</span>
+                        </>
+                    )}
                 </div>
             )}
         </>

@@ -26,7 +26,7 @@ const KioskLayout = ({ children }: { children: React.ReactNode }) => {
         <div >
 
             {children}
-            {/* <Agent movieData={movieData} /> */}
+            <Agent movieData={movieData} />
         </div >
     );
 };

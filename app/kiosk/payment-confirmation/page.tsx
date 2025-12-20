@@ -71,8 +71,7 @@ const PaymentConfirmation = () => {
             if (!response.ok) {
                 throw new Error(data.message || 'Failed to process your purchase. Please try again.');
             }
-
-
+            setIsDialogOpen(false);
             router.push('/kiosk/payment-sucessful');
         } catch (err) {
             console.error('Purchase error:', err);
@@ -84,7 +83,8 @@ const PaymentConfirmation = () => {
             }, 5000);
         } finally {
             setIsLoading(false);
-            setIsDialogOpen(false);
+
+
         }
     };
 
