@@ -25,11 +25,16 @@ interface Movie {
     releasedYear: number;
     duration: number;
     summary: string;
-    timeslot?: string;
-    month?: string;
-    week?: string;
+    timeslot: string;
+    slug: string;
     poster?: string;
     preview?: string;
+}
+
+interface MovieWithSeats extends Movie {
+    availableSeats: number;
+    totalSeats: number;
+    reservedSeats: string[];
 }
 
 interface ReservedSeat {
@@ -37,22 +42,17 @@ interface ReservedSeat {
     paymentStatus: string;
 }
 
-interface VoiceChatbotProps {
-    movieId?: string;
-    dayOfWeek?: string;
-    weekNumber?: string;
-}
-
-export default function VoiceChatbot({ movieId, dayOfWeek, weekNumber }: VoiceChatbotProps) {
+export default function VoiceChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const [transcript, setTranscript] = useState<string[]>([]);
     const [movies, setMovies] = useState<Movie[]>([]);
-    const [reservedSeats, setReservedSeats] = useState<ReservedSeat[]>([]);
+    const [moviesWithSeats, setMoviesWithSeats] = useState<MovieWithSeats[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(false);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const transcriptTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         // Auto-scroll to bottom when new messages arrive
@@ -64,140 +64,277 @@ export default function VoiceChatbot({ movieId, dayOfWeek, weekNumber }: VoiceCh
         }
     }, [transcript]);
 
+    // Auto-clear transcript after 5 minutes of inactivity
+    useEffect(() => {
+        // Clear any existing timer
+        if (transcriptTimerRef.current) {
+            clearTimeout(transcriptTimerRef.current);
+        }
+
+        // Only set timer if there's a transcript and chat is open
+        if (transcript.length > 0 && isOpen) {
+            transcriptTimerRef.current = setTimeout(() => {
+                console.log("Auto-clearing transcript after 5 minutes of inactivity");
+                setTranscript([]);
+                // Stop listening if currently active
+                if (isListening) {
+                    stopListening();
+                }
+            }, 5 * 60 * 1000); // 5 minutes in milliseconds
+        }
+
+        // Cleanup function
+        return () => {
+            if (transcriptTimerRef.current) {
+                clearTimeout(transcriptTimerRef.current);
+            }
+        };
+    }, [transcript, isOpen, isListening]);
+
     useEffect(() => {
         if (isOpen && movies.length === 0) {
-            fetchData();
+            fetchAllData();
         }
     }, [isOpen]);
 
+    // Auto-refresh data every 1 minute when chat is open
     useEffect(() => {
-        vapi.on("call-start", () => {
+        if (!isOpen) return;
+
+        // Fetch data immediately when opened
+        fetchAllData();
+
+        // Set up interval to refresh every 60 seconds (1 minute)
+        const intervalId = setInterval(() => {
+            console.log("Auto-refreshing movie and seat data...");
+            fetchAllData();
+        }, 60000); // 60000ms = 1 minute
+
+        // Cleanup interval on unmount or when chat closes
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        const handleCallStart = () => {
             setIsConnecting(false);
             setIsListening(true);
-        });
+        };
 
-        vapi.on("call-end", () => {
+        const handleCallEnd = () => {
             setIsListening(false);
             setIsConnecting(false);
-        });
+        };
 
-        vapi.on("speech-start", () => {
-            console.log("Assistant started speaking");
-        });
-
-        vapi.on("speech-end", () => {
-            console.log("Assistant finished speaking");
-        });
-
-        vapi.on("message", (message: any) => {
+        const handleMessage = (message: any) => {
             if (message.type === "transcript" && message.transcriptType === "final") {
                 const role = message.role === "user" ? "You" : "Assistant";
                 const text = message.transcript || "";
                 setTranscript(prev => [...prev, `${role}: ${text}`]);
             }
-        });
+        };
 
-        vapi.on("error", (error: any) => {
+        const handleError = (error: any) => {
             console.error("Vapi error:", error);
             setIsListening(false);
             setIsConnecting(false);
-        });
+        };
 
+        // Add event listeners
+        vapi.on("call-start", handleCallStart);
+        vapi.on("call-end", handleCallEnd);
+        vapi.on("message", handleMessage);
+        vapi.on("error", handleError);
+
+        // Cleanup function to remove event listeners
         return () => {
-            if (isListening) {
-                vapi.stop();
-            }
+            vapi.off("call-start", handleCallStart);
+            vapi.off("call-end", handleCallEnd);
+            vapi.off("message", handleMessage);
+            vapi.off("error", handleError);
         };
     }, []);
 
-    const fetchData = async () => {
-        setIsLoadingData(true);
+    // Helper function to convert 24-hour time to 12-hour format
+    const formatTo12Hour = (time: string): string => {
+        const [hourStr, minuteStr] = time.split(":");
+        let hour = parseInt(hourStr, 10);
+        const minute = minuteStr.padStart(2, "0");
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12 || 12;
+        return `${hour}:${minute} ${ampm}`;
+    };
+
+    // Helper function to get current day and week
+    const getCurrentDayAndWeek = () => {
+        const now = new Date();
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const currentDayOfWeek = days[now.getDay()];
+        const dayOfMonth = now.getDate();
+        const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
+        return { currentDayOfWeek, currentWeekNumber };
+    };
+
+    // Fetch all movies and their seat availability
+    const fetchAllData = async () => {
+        // Don't show loading spinner on subsequent fetches (auto-refresh)
+        const isInitialLoad = moviesWithSeats.length === 0;
+        if (isInitialLoad) {
+            setIsLoadingData(true);
+        }
+
         try {
+            // Fetch movies
             const moviesResponse = await fetch('/api/movies');
             const moviesData = await moviesResponse.json();
 
-            if (moviesData.movies) {
+            if (moviesData.movies && moviesData.movies.length > 0) {
                 setMovies(moviesData.movies);
-            }
 
-            if (movieId) {
-                let url = `/api/reservedSeats?movie_id=${movieId}`;
-                if (dayOfWeek) url += `&dayOfWeek=${dayOfWeek}`;
-                if (weekNumber) url += `&weekNumber=${weekNumber}`;
+                // Fetch seat availability for each movie
+                const { currentDayOfWeek, currentWeekNumber } = getCurrentDayAndWeek();
+                const totalSeats = 94;
 
-                const seatsResponse = await fetch(url);
-                const seatsData = await seatsResponse.json();
+                const moviesWithSeatData = await Promise.all(
+                    moviesData.movies.map(async (movie: Movie) => {
+                        try {
+                            const seatsResponse = await fetch(
+                                `/api/tickets/seats?movie_id=${movie._id}&dayOfWeek=${currentDayOfWeek}&weekNumber=${currentWeekNumber}`
+                            );
+                            const seatsData = await seatsResponse.json();
 
-                if (seatsData.reservedSeats) {
-                    setReservedSeats(seatsData.reservedSeats);
+                            const reservedSeatsList = (seatsData.reservedSeats || [])
+                                .filter((seat: ReservedSeat) =>
+                                    seat.paymentStatus === 'paid' || seat.paymentStatus === 'pending'
+                                )
+                                .map((seat: ReservedSeat) => seat.seatNumber);
+
+                            const availableSeats = totalSeats - reservedSeatsList.length;
+
+                            return {
+                                ...movie,
+                                availableSeats,
+                                totalSeats,
+                                reservedSeats: reservedSeatsList
+                            };
+                        } catch (error) {
+                            console.error(`Error fetching seats for ${movie.movieTitle}:`, error);
+                            return {
+                                ...movie,
+                                availableSeats: totalSeats,
+                                totalSeats,
+                                reservedSeats: []
+                            };
+                        }
+                    })
+                );
+
+                setMoviesWithSeats(moviesWithSeatData);
+
+                // Log when data is refreshed (except initial load)
+                if (!isInitialLoad) {
+                    console.log(`Data refreshed at ${new Date().toLocaleTimeString()}: ${moviesWithSeatData.length} movies updated`);
                 }
             }
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally {
-            setIsLoadingData(false);
+            if (isInitialLoad) {
+                setIsLoadingData(false);
+            }
         }
     };
 
     const buildSystemPrompt = () => {
-        const moviesList = movies.map(m => {
-            const timeslots = m.timeslot || "10:00 AM, 1:00 PM, 4:00 PM, 7:00 PM, 10:00 PM";
-            return `- ${m.movieTitle} (${m.releasedYear}, ${m.duration} minutes, Director: ${m.director}): ${m.summary}. Available timeslots: ${timeslots}`;
-        }).join('\n');
+        const { currentDayOfWeek, currentWeekNumber } = getCurrentDayAndWeek();
 
-        const totalSeats = 96;
-        const reservedCount = reservedSeats.filter(s => s.paymentStatus === 'completed' || s.paymentStatus === 'pending').length;
-        const availableCount = totalSeats - reservedCount;
+        const moviesInfo = moviesWithSeats.map(movie => {
+            const timeslot12hr = formatTo12Hour(movie.timeslot);
+            const seatInfo = `Available Seats: ${movie.availableSeats} out of ${movie.totalSeats}`;
 
-        const reservedSeatNumbers = reservedSeats
-            .filter(s => s.paymentStatus === 'completed' || s.paymentStatus === 'pending')
-            .map(s => s.seatNumber)
-            .join(', ');
+            return `**${movie.movieTitle}**
+- Year: ${movie.releasedYear}
+- Duration: ${movie.duration} minutes
+- Director: ${movie.director}
+- Showtime: ${timeslot12hr}
+- ${seatInfo}
+- Summary: ${movie.summary}`;
+        }).join('\n\n');
 
         return `You are CineAI Assistant, a helpful voice chatbot for a movie theater kiosk. You help customers with information about movies, showtimes, pricing, and seat availability.
 
 IMPORTANT INFORMATION:
 - Ticket Price: 200 pesos per ticket (fixed price for all movies and showtimes)
-- Available Time Slots: Check individual movie timeslots below
+- Current Day: ${currentDayOfWeek}
+- Current Week: ${currentWeekNumber}
+- Cinema Policy: Outside food and drinks are not allowed inside the theater
+- Cinema Policy: Customer are prohibited from filming or taking photos inside the theater
 
-AVAILABLE MOVIES (${movies.length} movies showing):
-${moviesList || "Loading movies..."}
+AVAILABLE MOVIES AND SEAT AVAILABILITY (${moviesWithSeats.length} movies showing today):
 
-SEAT AVAILABILITY:
-- Total seats: ${totalSeats} (8 rows A-H, 12 seats per row)
-- Reserved/Sold seats: ${reservedCount}
-- Available seats: ${availableCount} seats available
-${reservedSeatNumbers ? `- Currently reserved seats: ${reservedSeatNumbers}` : ''}
+${moviesInfo}
 
-GUIDELINES:
-1. Be friendly, concise, and helpful
-2. Provide movie recommendations based on genre preferences or year
-3. Answer questions about showtimes, pricing, and seat availability
-4. Guide users through the booking process
-5. Keep responses brief and conversational (2-3 sentences max)
-6. If asked about booking, inform them they can select their movie and seats on the kiosk screen
-7. Always mention the price is 200 pesos per ticket when discussing pricing
-8. When discussing seat availability, mention the number of available seats
-9. If asked about specific seats, check against the reserved list
+GUIDELINES FOR RESPONDING:
+1. Be friendly, warm, and conversational - speak naturally like a helpful person
+2. Keep responses brief (2-3 sentences maximum) to maintain natural conversation flow
+3. Always format showtimes in 12-hour format (e.g., "2:30 PM")
+4. When mentioning seat availability, be specific: "[X] seats available out of [Total]"
+5. All information is already provided above - no need to search or call functions
+6. If asked about a movie, mention its showtime and seat availability together
+7. Always ask if they need help with anything else before ending the conversation
+8. Never say goodbye unless the user clearly indicates they're done
+9. If the user asks something outside your scope, politely inform them you can only assist with movie and theater-related questions
+10. When they want to buy ticket, tell them to proceed to their screen to complete the booking process
+11. When ask where do they pay the ticket after booking in the kiosk, tell them to proceed to the facility's cashier counter to make the payment and collect their tickets
+12. When asked about snacks or food, inform them about the no food policy and we don't sell snacks in the theater
 
-Example interactions:
-- "What movies are showing?" → List 2-3 popular movies briefly
-- "What time is [movie] showing?" → Provide the timeslots for that movie
-- "How much are tickets?" → "Tickets are 200 pesos each for all movies and showtimes"
-- "Are seats available?" → "Yes, we have ${availableCount} seats available out of ${totalSeats}"
-- "Tell me about [movie]" → Give brief summary and director`;
+
+RESPONSE EXAMPLES:
+User: "What movies are showing?"
+You: "We have [X] great films today! [List 2-3 with showtimes]. Which one interests you?"
+
+User: "Tell me about [Movie Name]"
+You: "[Movie] is a [duration]-minute film by [director] showing at [time]. [Brief 1-sentence plot]. We have [X] seats available. Would you like to know more?"
+
+User: "What time is [Movie] showing?"
+You: "[Movie] is showing at [time], and we currently have [X] seats available out of [total]."
+
+User: "Are seats available for [Movie]?"
+You: "Yes! For [Movie] at [time], we have [X] seats available out of [total]. Would you like to proceed with booking?"
+
+User: "How much are tickets?"
+You: "Tickets are 200 pesos each for all movies and showtimes. Is there a specific movie you'd like to watch?"
+
+User: "Can I bring snacks?"
+You: "I'm sorry, but outside food and drinks aren't allowed in the theater. However, we have concessions available! Can I help you choose a movie?"
+
+IMPORTANT REMINDERS:
+- Always be conversational and natural - avoid sounding robotic
+- Keep responses short and engaging
+- Include seat availability when discussing specific movies
+- Use 12-hour time format (AM/PM)
+- Ask follow-up questions to keep the conversation going
+- Only end with goodbye if the user clearly indicates they're finished`;
     };
 
     const startListening = async () => {
         if (isListening || isConnecting) return;
 
-        if (movies.length === 0) {
-            await fetchData();
+        // Ensure data is loaded
+        if (moviesWithSeats.length === 0) {
+            await fetchAllData();
+        }
+
+        // Wait a bit to ensure data is fully loaded
+        if (moviesWithSeats.length === 0) {
+            console.error("Failed to load movie data");
+            return;
         }
 
         try {
             setIsConnecting(true);
-            setTranscript([]);
+            // DO NOT clear transcript here - preserve existing conversation
 
             await vapi.start({
                 model: {
@@ -215,14 +352,16 @@ Example interactions:
                     voiceId: "21m00Tcm4TlvDq8ikWAM"
                 },
                 name: "CineAI Chatbot Assistant",
-                firstMessage: "Hi! I'm your CineAI assistant. How can I help you today? You can ask me about our movies, showtimes, pricing, or seat availability.",
+                firstMessage: transcript.length === 0
+                    ? "Hi! Welcome to CineAI. I am an AI chatbot here to assist you with movie information, showtimes,ticket booking, and more about our theater. How can I help you today?"
+                    : "I'm back and ready to help! What else would you like to know?",
                 transcriber: {
                     provider: "deepgram",
                     model: "nova-2",
                     language: "en"
                 },
                 recordingEnabled: false,
-                endCallFunctionEnabled: true,
+                endCallFunctionEnabled: false,
                 clientMessages: ["transcript", "hang", "speech-update"],
                 serverMessages: ["end-of-call-report", "hang", "speech-update"]
             });
@@ -239,6 +378,7 @@ Example interactions:
             await vapi.stop();
             setIsListening(false);
             setIsConnecting(false);
+            // Transcript is preserved - no clearing here
         } catch (error) {
             console.error("Error stopping chatbot:", error);
         }
@@ -249,8 +389,11 @@ Example interactions:
             await stopListening();
         }
         setIsOpen(false);
-        setTranscript([]);
+        // Keep transcript intact even when closing chat window
+        // If you want to clear on close, uncomment the line below:
+        // setTranscript([]);
     };
+
 
     return (
         <>
@@ -268,9 +411,9 @@ Example interactions:
 
             {/* Chat Window */}
             {isOpen && (
-                <Card className="fixed top-6 left-6 z-50 w-96 h-[580px] flex flex-col shadow-xl py-6 gap-2 bg-neutral-800 border-neutral-700" >
+                <Card className="fixed top-6 left-6 z-50 w-96 h-[580px] flex flex-col shadow-xl py-6 gap-2 bg-neutral-800 border-neutral-700">
                     {/* Header */}
-                    <CardHeader className="text-primary-foreground ">
+                    <CardHeader className="text-primary-foreground">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-full bg-neutral-600 flex items-center justify-center">
@@ -291,18 +434,21 @@ Example interactions:
                                     </CardDescription>
                                 </div>
                             </div>
-                            <Button
-                                onClick={closeChat}
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 text-white "
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+
+                                <Button
+                                    onClick={closeChat}
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8 text-white"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
 
-                    {/* Transcript Area with ScrollArea */}
+                    {/* Transcript Area */}
                     <CardContent className="flex-1 p-4 min-h-0">
                         <ScrollArea ref={scrollAreaRef} className="h-full w-full rounded-md border bg-neutral-800/30">
                             <div className="p-4">
@@ -316,11 +462,13 @@ Example interactions:
                                         <MessageCircle className="h-12 w-12 mb-3 text-muted-foreground/50" />
                                         <p className="text-sm font-medium mb-1">Ready to assist you</p>
                                         <p className="text-xs mb-3">Click &quot;Start Listening&quot; to begin</p>
-                                        {/* {movies.length > 0 && (
-                                            <Badge variant="secondary" className="text-xs">
-                                                {movies.length} movies loaded
-                                            </Badge>
-                                        )} */}
+                                        {moviesWithSeats.length > 0 && (
+                                            <div className="flex flex-col items-center gap-1">
+                                                <p className="text-xs text-muted-foreground/60 mt-1">
+                                                    Auto-refreshing every minute
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -356,12 +504,12 @@ Example interactions:
                         {!isListening && !isConnecting ? (
                             <Button
                                 onClick={startListening}
-                                disabled={isLoadingData}
+                                disabled={isLoadingData || moviesWithSeats.length === 0}
                                 className="w-full"
                                 size="lg"
                             >
                                 <Mic className="h-4 w-4 mr-2" />
-                                Start Listening
+                                {transcript.length > 0 ? "Resume Listening" : moviesWithSeats.length === 0 ? "Loading..." : "Start Listening"}
                             </Button>
                         ) : (
                             <Button
