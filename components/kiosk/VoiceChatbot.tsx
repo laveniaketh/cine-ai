@@ -54,6 +54,15 @@ export default function VoiceChatbot() {
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const transcriptTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Notify VoiceNavigation about chatbot state changes
+    useEffect(() => {
+        // Dispatch custom event to notify VoiceNavigation
+        const event = new CustomEvent('voiceChatbotStateChange', {
+            detail: { isOpen }
+        });
+        window.dispatchEvent(event);
+    }, [isOpen]);
+
     useEffect(() => {
         // Auto-scroll to bottom when new messages arrive
         if (scrollAreaRef.current) {
