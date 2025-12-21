@@ -25,7 +25,7 @@ const PaymentSuccessful = () => {
                     <span className="text-gradient">Booked</span> Successfully
                 </h1>
             </div>
-            <div className="mt-20 text-center flex flex-col items-center justify-center h-full gap-4">
+            <div className="mt-6 text-center flex flex-col items-center justify-center h-full gap-4">
                 <Countdown />
                 <Link href="/kiosk" onClick={clearSelection}>
                     <Button className="text-2xl px-12 py-4 h-auto rounded-4xl">Back to Home</Button>
