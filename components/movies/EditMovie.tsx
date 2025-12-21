@@ -223,9 +223,15 @@ export const EditMovie = ({
                 throw new Error(data.message || 'Failed to update movie')
             }
 
-            // Refresh the movie list
+            // Reset file states after successful update
+            setPosterFile(null)
+            setPreviewFile(null)
+            setHasChanges(false)
+
+
             if (onMovieUpdated) {
-                onMovieUpdated()
+                await onMovieUpdated()
+
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update movie')

@@ -105,7 +105,7 @@ MovieSchema.pre("save", function (next) {
     movie.timeslot = normalizeTime(movie.timeslot);
   }
 
-  next();
+  // next();
 });
 
 // Helper function to generate URL-friendly slug
