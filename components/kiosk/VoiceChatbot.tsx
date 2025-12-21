@@ -259,7 +259,8 @@ Example interactions:
                 <Button
                     onClick={() => setIsOpen(true)}
                     size="lg"
-                    className="fixed top-6 left-6 z-50 h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground border-0"
+                    className="fixed top-6 left-6 z-50 h-14 w-14 rounded-full"
+                    variant="default"
                 >
                     <MessageCircle className="h-6 w-6" />
                 </Button>
@@ -267,16 +268,16 @@ Example interactions:
 
             {/* Chat Window */}
             {isOpen && (
-                <Card className="fixed top-6 left-6 z-50 w-96 h-[600px] flex flex-col shadow-xl">
+                <Card className="fixed top-6 left-6 z-50 w-96 h-[580px] flex flex-col shadow-xl py-6 gap-2 bg-neutral-800 border-neutral-700" >
                     {/* Header */}
-                    <CardHeader className="pb-3 bg-primary text-primary-foreground rounded-t-lg">
+                    <CardHeader className="text-primary-foreground ">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                                    <MessageCircle className="h-5 w-5" />
+                                <div className="h-10 w-10 rounded-full bg-neutral-600 flex items-center justify-center">
+                                    <MessageCircle className="h-5 w-5 text-neutral-500" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg">CineAI Assistant</CardTitle>
+                                    <CardTitle className="text-lg text-white">CineAI Assistant</CardTitle>
                                     <CardDescription className="text-xs text-primary-foreground/80">
                                         {isLoadingData ? (
                                             "Loading data..."
@@ -285,16 +286,16 @@ Example interactions:
                                         ) : isConnecting ? (
                                             <Badge variant="secondary" className="px-2 py-0">Connecting</Badge>
                                         ) : (
-                                            `${movies.length} movies available`
+                                            <Badge variant="default" className="px-2 py-0">Online</Badge>
                                         )}
                                     </CardDescription>
                                 </div>
                             </div>
                             <Button
                                 onClick={closeChat}
-                                variant="ghost"
+                                variant="outline"
                                 size="icon"
-                                className="h-8 w-8 hover:bg-primary-foreground/20 text-primary-foreground"
+                                className="h-8 w-8 text-white "
                             >
                                 <X className="h-4 w-4" />
                             </Button>
@@ -303,23 +304,23 @@ Example interactions:
 
                     {/* Transcript Area with ScrollArea */}
                     <CardContent className="flex-1 p-4 min-h-0">
-                        <ScrollArea ref={scrollAreaRef} className="h-full w-full rounded-md border bg-muted/30">
+                        <ScrollArea ref={scrollAreaRef} className="h-full w-full rounded-md border bg-neutral-800/30">
                             <div className="p-4">
                                 {isLoadingData ? (
-                                    <div className="flex flex-col items-center justify-center min-h-[380px] text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center min-h-[300px] text-muted-foreground">
                                         <Loader2 className="h-12 w-12 mb-3 animate-spin text-primary" />
                                         <p className="text-sm">Loading movie information...</p>
                                     </div>
                                 ) : transcript.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center min-h-[380px] text-center text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center min-h-[300px] text-center text-muted-foreground">
                                         <MessageCircle className="h-12 w-12 mb-3 text-muted-foreground/50" />
                                         <p className="text-sm font-medium mb-1">Ready to assist you</p>
-                                        <p className="text-xs mb-3">Click "Start Listening" to begin</p>
-                                        {movies.length > 0 && (
+                                        <p className="text-xs mb-3">Click &quot;Start Listening&quot; to begin</p>
+                                        {/* {movies.length > 0 && (
                                             <Badge variant="secondary" className="text-xs">
                                                 {movies.length} movies loaded
                                             </Badge>
-                                        )}
+                                        )} */}
                                     </div>
                                 ) : (
                                     <div className="space-y-3">

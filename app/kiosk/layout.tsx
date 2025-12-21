@@ -8,11 +8,9 @@ const KioskLayout = ({ children }: { children: React.ReactNode }) => {
     return (
         <div >
             {/* Voice Navigation Assistant */}
-            <VoiceNavigation />
-
+            {/* <VoiceNavigation /> */}
             {/* Voice Chatbot Assistant */}
             <VoiceChatbot />
-
             {children}
 
         </div >

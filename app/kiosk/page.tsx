@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
-import Countdown from '@/components/kiosk/Countdown'
 
 const Hero = () => {
     return (
