@@ -3,11 +3,12 @@ import connectDB from "@/lib/mongodb";
 import Ticket from "@/database/ticket.model";
 import Payment from "@/database/payment.model";
 import ReservedSeat from "@/database/reservedSeat.model";
+import { sanitizeString } from "@/lib/sanitize";
 
 // GET single ticket by ticket_id
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await connectDB();
@@ -18,18 +19,18 @@ export async function GET(
     if (isNaN(ticketId)) {
       return NextResponse.json(
         { message: "Invalid ticket ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const ticket = await Ticket.findOne({ ticket_id: ticketId }).populate(
-      "movie_id"
+      "movie_id",
     );
 
     if (!ticket) {
       return NextResponse.json(
         { message: `Ticket #${ticketId} not found` },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -53,7 +54,7 @@ export async function GET(
           reservedSeats: reservedSeats.map((seat) => seat.seatNumber),
         },
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     console.error(e);
@@ -62,7 +63,7 @@ export async function GET(
         message: "Failed to fetch ticket",
         error: e instanceof Error ? e.message : "Unknown",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -70,7 +71,7 @@ export async function GET(
 // PATCH - Update payment status
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await connectDB();
@@ -81,18 +82,20 @@ export async function PATCH(
     if (isNaN(ticketId)) {
       return NextResponse.json(
         { message: "Invalid ticket ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const body = await req.json();
-    const { paymentStatus } = body;
+
+    // Sanitize input to prevent NoSQL injection
+    const paymentStatus = sanitizeString(body.paymentStatus);
 
     // Validate paymentStatus
     if (!paymentStatus) {
       return NextResponse.json(
         { message: "paymentStatus is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -100,7 +103,7 @@ export async function PATCH(
     if (!validStatuses.includes(paymentStatus.toLowerCase())) {
       return NextResponse.json(
         { message: "paymentStatus must be paid, pending, or cancelled" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -110,7 +113,7 @@ export async function PATCH(
     if (!ticket) {
       return NextResponse.json(
         { message: `Ticket #${ticketId} not found` },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -118,13 +121,13 @@ export async function PATCH(
     const updatedPayment = await Payment.findOneAndUpdate(
       { ticket_id: ticket._id },
       { paymentStatus: paymentStatus.toLowerCase() },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedPayment) {
       return NextResponse.json(
         { message: "Payment record not found for this ticket" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -138,7 +141,7 @@ export async function PATCH(
           updatedAt: updatedPayment.updatedAt,
         },
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     console.error(e);
@@ -147,7 +150,7 @@ export async function PATCH(
         message: "Failed to update payment status",
         error: e instanceof Error ? e.message : "Unknown",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

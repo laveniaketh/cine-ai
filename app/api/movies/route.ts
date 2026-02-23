@@ -3,6 +3,7 @@ import { revalidateTag, unstable_cache } from "next/cache";
 import connectDB from "@/lib/mongodb";
 import Movie from "@/database/movie.model";
 import { v2 as cloudinary } from "cloudinary";
+import { sanitizeString, validateImageUpload } from "@/lib/sanitize";
 
 // Cached function to fetch movies
 const getCachedMovies = unstable_cache(
@@ -15,7 +16,7 @@ const getCachedMovies = unstable_cache(
   {
     revalidate: 300, // Revalidate every 5 minutes (300 seconds)
     tags: ["movies"], // Tag for on-demand revalidation
-  }
+  },
 );
 
 export async function POST(req: NextRequest) {
@@ -26,36 +27,46 @@ export async function POST(req: NextRequest) {
 
     let movie: any = {};
 
-    // Extract text fields
-    movie.movieTitle = formData.get("movieTitle") as string;
-    movie.director = formData.get("director") as string;
-    movie.releasedYear = parseInt(formData.get("releasedYear") as string);
-    movie.duration = parseInt(formData.get("duration") as string);
-    movie.summary = formData.get("summary") as string;
-    movie.timeslot = formData.get("timeslot") as string;
-    movie.month = formData.get("month") as string;
-    movie.week = formData.get("week") as string;
+    // Extract and sanitize text fields
+    movie.movieTitle = sanitizeString(formData.get("movieTitle"));
+    movie.director = sanitizeString(formData.get("director"));
+    const releasedYearStr = sanitizeString(formData.get("releasedYear"));
+    const durationStr = sanitizeString(formData.get("duration"));
+    movie.releasedYear = releasedYearStr ? parseInt(releasedYearStr) : NaN;
+    movie.duration = durationStr ? parseInt(durationStr) : NaN;
+    movie.summary = sanitizeString(formData.get("summary"));
+    movie.timeslot = sanitizeString(formData.get("timeslot"));
+    movie.month = sanitizeString(formData.get("month"));
+    movie.week = sanitizeString(formData.get("week"));
 
     // Validate required fields
     if (
       !movie.movieTitle ||
       !movie.director ||
-      !movie.releasedYear ||
-      !movie.duration ||
+      isNaN(movie.releasedYear) ||
+      isNaN(movie.duration) ||
       !movie.summary
     ) {
       return NextResponse.json(
         { message: "Required fields are missing" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Handle poster upload
+    // Handle poster upload with validation
     const posterFile = formData.get("poster") as File;
     if (!posterFile) {
       return NextResponse.json(
         { message: "Poster image is required" },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    const posterValidation = await validateImageUpload(posterFile);
+    if (!posterValidation.valid) {
+      return NextResponse.json(
+        { message: `Poster: ${posterValidation.error}` },
+        { status: 400 },
       );
     }
 
@@ -67,19 +78,27 @@ export async function POST(req: NextRequest) {
           (error, result) => {
             if (error) reject(error);
             else resolve(result);
-          }
+          },
         )
         .end(posterBuffer);
     });
 
     movie.poster = (posterUpload as { secure_url: string }).secure_url;
 
-    // Handle preview upload
+    // Handle preview upload with validation
     const previewFile = formData.get("preview") as File;
     if (!previewFile) {
       return NextResponse.json(
         { message: "Preview image is required" },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    const previewValidation = await validateImageUpload(previewFile);
+    if (!previewValidation.valid) {
+      return NextResponse.json(
+        { message: `Preview: ${previewValidation.error}` },
+        { status: 400 },
       );
     }
 
@@ -91,7 +110,7 @@ export async function POST(req: NextRequest) {
           (error, result) => {
             if (error) reject(error);
             else resolve(result);
-          }
+          },
         )
         .end(previewBuffer);
     });
@@ -105,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       { message: "Movie created successfully", movie: createdMovie },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (e) {
     console.error(e);
@@ -114,7 +133,7 @@ export async function POST(req: NextRequest) {
         message: "Movie creation failed",
         error: e instanceof Error ? e.message : "Unknown",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -132,12 +151,12 @@ export async function GET() {
           // Cache for 5 minutes on CDN, serve stale for up to 10 minutes while revalidating
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
         },
-      }
+      },
     );
   } catch (e) {
     return NextResponse.json(
       { message: "Movies fetch failed", error: e },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

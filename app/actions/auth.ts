@@ -97,14 +97,15 @@ export async function signup(state: FormState, formData: FormData) {
     await createSession(
       newAdmin._id.toString(),
       newAdmin.username,
-      newAdmin.email
+      newAdmin.email,
+      newAdmin.role || "admin",
     );
   } catch (error: any) {
     console.error("Registration error:", error);
 
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(
-        (err: any) => err.message
+        (err: any) => err.message,
       );
       return {
         message: messages.join(", "),
@@ -133,7 +134,7 @@ export async function login(state: FormState, formData: FormData) {
   if (!validatedFields.success) {
     console.log(
       "Validation failed:",
-      validatedFields.error.flatten().fieldErrors
+      validatedFields.error.flatten().fieldErrors,
     );
     return {
       errors: validatedFields.error.flatten().fieldErrors,
@@ -172,7 +173,12 @@ export async function login(state: FormState, formData: FormData) {
 
     // 4. Create session
     console.log("Creating session for admin:", admin.username);
-    await createSession(admin._id.toString(), admin.username, admin.email);
+    await createSession(
+      admin._id.toString(),
+      admin.username,
+      admin.email,
+      admin.role || "admin",
+    );
     console.log("Session created successfully");
   } catch (error: any) {
     console.error("Login error details:", error);

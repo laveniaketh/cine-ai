@@ -2,23 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Admin from "@/database/admin.model";
 import bcrypt from "bcryptjs";
+import { sanitizeString } from "@/lib/sanitize";
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
     const body = await req.json();
-    const { fullName, email, username, password } = body;
+
+    // Sanitize inputs — reject objects/arrays to prevent NoSQL injection
+    const fullName = sanitizeString(body.fullName);
+    const email = sanitizeString(body.email);
+    const username = sanitizeString(body.username);
+    const password = sanitizeString(body.password);
 
     // Validate required fields
     if (!fullName || !email || !username || !password) {
       return NextResponse.json(
         { message: "All fields are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Check if admin already exists
+    // Check if admin already exists (safe: values are guaranteed strings)
     const existingAdmin = await Admin.findOne({
       $or: [{ email: email.toLowerCase() }, { username }],
     });
@@ -28,7 +34,7 @@ export async function POST(req: NextRequest) {
         existingAdmin.email === email.toLowerCase() ? "Email" : "Username";
       return NextResponse.json(
         { message: `${field} already exists` },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
           username: newAdmin.username,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Registration error:", error);
@@ -62,17 +68,17 @@ export async function POST(req: NextRequest) {
     // Handle Mongoose validation errors
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(
-        (err: any) => err.message
+        (err: any) => err.message,
       );
       return NextResponse.json(
         { message: messages.join(", ") },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { message: "Failed to create admin account" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

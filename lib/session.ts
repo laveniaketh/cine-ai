@@ -6,6 +6,7 @@ export interface SessionPayload {
   adminId: string;
   username: string;
   email: string;
+  role: string;
   expiresAt: Date;
 }
 
@@ -35,10 +36,11 @@ export async function decrypt(session: string | undefined = "") {
 export async function createSession(
   adminId: string,
   username: string,
-  email: string
+  email: string,
+  role: string,
 ) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const session = await encrypt({ adminId, username, email, expiresAt });
+  const session = await encrypt({ adminId, username, email, role, expiresAt });
   const cookieStore = await cookies();
 
   cookieStore.set("session", session, {

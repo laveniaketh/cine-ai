@@ -1,15 +1,13 @@
 import AdminNav from "@/components/AdminNav"
-// import { Suspense } from "react"
-// import Loading from "./loading"
+import { verifySession } from "@/lib/dal"
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
+const Layout = async ({ children }: { children: React.ReactNode }) => {
+    const session = await verifySession()
+
     return (
         <div className="">
-            {/* <Suspense fallback={<Loading />}> */}
-            <AdminNav />
+            <AdminNav role={session.role} />
             {children}
-            {/* </Suspense> */}
-
         </div>
     )
 }

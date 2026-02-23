@@ -1,11 +1,15 @@
 import { Schema, model, models, Document } from "mongoose";
 
+// Valid roles
+export type AdminRole = "admin" | "cashier";
+
 // TypeScript interface for Admin document
 export interface IAdmin extends Document {
   fullName: string;
   email: string;
   username: string;
   password: string;
+  role: AdminRole;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,10 +50,16 @@ const AdminSchema = new Schema<IAdmin>(
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
     },
+    role: {
+      type: String,
+      enum: ["admin", "cashier"],
+      default: "admin",
+      required: true,
+    },
   },
   {
-    timestamps: true, // Auto-generate createdAt and updatedAt
-  }
+    timestamps: true,
+  },
 );
 
 // Create index on email for better query performance

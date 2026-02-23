@@ -1,13 +1,11 @@
 "use client";
 import { cn } from "@/lib/utils";
-// import { IconMenu2, IconX } from "@tabler/icons-react";
 import {
   motion,
   AnimatePresence,
   useScroll,
   useMotionValueEvent,
 } from "motion/react";
-import { p } from "motion/react-client";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
