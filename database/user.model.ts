@@ -1,20 +1,20 @@
 import { Schema, model, models, Document } from "mongoose";
 
 // Valid roles
-export type AdminRole = "admin" | "cashier";
+export type UserRole = "admin" | "cashier";
 
-// TypeScript interface for Admin document
-export interface IAdmin extends Document {
+// TypeScript interface for User document
+export interface IUser extends Document {
   fullName: string;
   email: string;
   username: string;
   password: string;
-  role: AdminRole;
+  role: UserRole;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const AdminSchema = new Schema<IAdmin>(
+const UserSchema = new Schema<IUser>(
   {
     fullName: {
       type: String,
@@ -63,11 +63,11 @@ const AdminSchema = new Schema<IAdmin>(
 );
 
 // Create index on email for better query performance
-AdminSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ email: 1 }, { unique: true });
 
 // Create index on username for better query performance
-AdminSchema.index({ username: 1 }, { unique: true });
+UserSchema.index({ username: 1 }, { unique: true });
 
-const Admin = models.Admin || model<IAdmin>("Admin", AdminSchema);
+const User = models.User || model<IUser>("User", UserSchema, "users");
 
-export default Admin;
+export default User;

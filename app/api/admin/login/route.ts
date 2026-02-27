@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
-import Admin from "@/database/admin.model";
+import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
 import { encrypt } from "@/lib/session";
 import { sanitizeString } from "@/lib/sanitize";
@@ -23,12 +23,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find admin by username or email (safe: username is guaranteed to be a string)
-    const admin = await Admin.findOne({
+    // Find user by username or email (safe: username is guaranteed to be a string)
+    const user = await User.findOne({
       $or: [{ username }, { email: username.toLowerCase() }],
     });
 
-    if (!admin) {
+    if (!user) {
       return NextResponse.json(
         { message: "Invalid credentials" },
         { status: 401 },
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -48,10 +48,10 @@ export async function POST(req: NextRequest) {
     // Generate JWT token using jose (via shared encrypt function)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const token = await encrypt({
-      adminId: admin._id.toString(),
-      username: admin.username,
-      email: admin.email,
-      role: admin.role || "admin",
+      userId: user._id.toString(),
+      username: user.username,
+      email: user.email,
+      role: user.role || "admin",
       expiresAt,
     });
 
@@ -60,12 +60,12 @@ export async function POST(req: NextRequest) {
       {
         message: "Login successful",
         token,
-        admin: {
-          id: admin._id,
-          fullName: admin.fullName,
-          email: admin.email,
-          username: admin.username,
-          role: admin.role || "admin",
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          username: user.username,
+          role: user.role || "admin",
         },
       },
       { status: 200 },

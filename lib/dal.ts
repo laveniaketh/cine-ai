@@ -8,13 +8,13 @@ export const verifySession = cache(async () => {
   const cookie = (await cookies()).get("session")?.value;
   const session = await decrypt(cookie);
 
-  if (!session?.adminId) {
+  if (!session?.userId) {
     redirect("/");
   }
 
   return {
     isAuth: true,
-    adminId: session.adminId,
+    userId: session.userId,
     username: session.username,
     email: session.email,
     role: session.role,

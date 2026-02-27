@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
-import Admin from "@/database/admin.model";
+import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
 import { sanitizeString } from "@/lib/sanitize";
 import { decrypt } from "@/lib/session";
@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 async function verifyAdmin() {
   const cookie = (await cookies()).get("session")?.value;
   const session = await decrypt(cookie);
-  if (!session?.adminId || session.role !== "admin") {
+  if (!session?.userId || session.role !== "admin") {
     return null;
   }
   return session;
@@ -29,9 +29,7 @@ export async function GET() {
 
     await connectDB();
 
-    const users = await Admin.find()
-      .select("-password")
-      .sort({ createdAt: -1 });
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
 
     return NextResponse.json(
       { message: "Users fetched successfully", users },
@@ -84,7 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await Admin.findOne({
+    const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username }],
     });
 
@@ -99,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const newUser = await Admin.create({
+    const newUser = await User.create({
       fullName,
       email: email.toLowerCase(),
       username,

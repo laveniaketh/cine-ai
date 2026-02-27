@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
-import Admin from "@/database/admin.model";
+import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
 import { sanitizeString } from "@/lib/sanitize";
 
@@ -15,23 +15,33 @@ export async function POST(req: NextRequest) {
     const email = sanitizeString(body.email);
     const username = sanitizeString(body.username);
     const password = sanitizeString(body.password);
+    const role = sanitizeString(body.role);
 
     // Validate required fields
-    if (!fullName || !email || !username || !password) {
+    if (!fullName || !email || !username || !password || !role) {
       return NextResponse.json(
         { message: "All fields are required" },
         { status: 400 },
       );
     }
 
-    // Check if admin already exists (safe: values are guaranteed strings)
-    const existingAdmin = await Admin.findOne({
+    // Validate role
+    const validRoles = ["admin", "cashier"];
+    if (!validRoles.includes(role)) {
+      return NextResponse.json(
+        { message: "Role must be admin or cashier" },
+        { status: 400 },
+      );
+    }
+
+    // Check if user already exists (safe: values are guaranteed strings)
+    const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username }],
     });
 
-    if (existingAdmin) {
+    if (existingUser) {
       const field =
-        existingAdmin.email === email.toLowerCase() ? "Email" : "Username";
+        existingUser.email === email.toLowerCase() ? "Email" : "Username";
       return NextResponse.json(
         { message: `${field} already exists` },
         { status: 409 },
@@ -41,23 +51,25 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create new admin
-    const newAdmin = await Admin.create({
+    // Create new user
+    const newUser = await User.create({
       fullName,
       email,
       username,
       password: hashedPassword,
+      role,
     });
 
     // Return success without password
     return NextResponse.json(
       {
-        message: "Admin account created successfully",
-        admin: {
-          id: newAdmin._id,
-          fullName: newAdmin.fullName,
-          email: newAdmin.email,
-          username: newAdmin.username,
+        message: "User account created successfully",
+        user: {
+          id: newUser._id,
+          fullName: newUser.fullName,
+          email: newUser.email,
+          username: newUser.username,
+          role: newUser.role,
         },
       },
       { status: 201 },
@@ -77,7 +89,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: "Failed to create admin account" },
+      { message: "Failed to create user account" },
       { status: 500 },
     );
   }

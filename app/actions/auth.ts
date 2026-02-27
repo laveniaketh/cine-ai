@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import connectDB from "@/lib/mongodb";
-import Admin from "@/database/admin.model";
+import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
 import { createSession, deleteSession } from "@/lib/session";
 import { redirect } from "next/navigation";
@@ -69,14 +69,14 @@ export async function signup(state: FormState, formData: FormData) {
   try {
     await connectDB();
 
-    // 2. Check if admin already exists
-    const existingAdmin = await Admin.findOne({
+    // 2. Check if user already exists
+    const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username }],
     });
 
-    if (existingAdmin) {
+    if (existingUser) {
       const field =
-        existingAdmin.email === email.toLowerCase() ? "Email" : "Username";
+        existingUser.email === email.toLowerCase() ? "Email" : "Username";
       return {
         message: `${field} already exists`,
       };
@@ -85,8 +85,8 @@ export async function signup(state: FormState, formData: FormData) {
     // 3. Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // 4. Create new admin
-    const newAdmin = await Admin.create({
+    // 4. Create new user
+    const newUser = await User.create({
       fullName,
       email,
       username,
@@ -95,10 +95,10 @@ export async function signup(state: FormState, formData: FormData) {
 
     // 5. Create session
     await createSession(
-      newAdmin._id.toString(),
-      newAdmin.username,
-      newAdmin.email,
-      newAdmin.role || "admin",
+      newUser._id.toString(),
+      newUser.username,
+      newUser.email,
+      newUser.role || "admin",
     );
   } catch (error: any) {
     console.error("Registration error:", error);
@@ -113,7 +113,7 @@ export async function signup(state: FormState, formData: FormData) {
     }
 
     return {
-      message: "Failed to create admin account",
+      message: "Failed to create user account",
     };
   }
 
@@ -148,21 +148,21 @@ export async function login(state: FormState, formData: FormData) {
     await connectDB();
     console.log("Database connected");
 
-    // 2. Find admin by username or email
-    const admin = await Admin.findOne({
+    // 2. Find user by username or email
+    const user = await User.findOne({
       $or: [{ username }, { email: username.toLowerCase() }],
     });
 
-    console.log("Admin found:", admin ? "Yes" : "No");
+    console.log("User found:", user ? "Yes" : "No");
 
-    if (!admin) {
+    if (!user) {
       return {
         message: "Invalid credentials",
       };
     }
 
     // 3. Verify password
-    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     console.log("Password valid:", isPasswordValid);
 
     if (!isPasswordValid) {
@@ -172,12 +172,12 @@ export async function login(state: FormState, formData: FormData) {
     }
 
     // 4. Create session
-    console.log("Creating session for admin:", admin.username);
+    console.log("Creating session for user:", user.username);
     await createSession(
-      admin._id.toString(),
-      admin.username,
-      admin.email,
-      admin.role || "admin",
+      user._id.toString(),
+      user.username,
+      user.email,
+      user.role || "admin",
     );
     console.log("Session created successfully");
   } catch (error: any) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
-import Admin from "@/database/admin.model";
+import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
 import { sanitizeString } from "@/lib/sanitize";
 import { decrypt } from "@/lib/session";
@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 async function verifyAdmin() {
   const cookie = (await cookies()).get("session")?.value;
   const session = await decrypt(cookie);
-  if (!session?.adminId || session.role !== "admin") {
+  if (!session?.userId || session.role !== "admin") {
     return null;
   }
   return session;
@@ -41,7 +41,7 @@ export async function GET(
       );
     }
 
-    const user = await Admin.findById(id).select("-password");
+    const user = await User.findById(id).select("-password");
 
     if (!user) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
@@ -131,7 +131,7 @@ export async function PUT(
       if (updateData.username)
         orConditions.push({ username: updateData.username });
 
-      const existingUser = await Admin.findOne({
+      const existingUser = await User.findOne({
         $or: orConditions,
         _id: { $ne: id },
       });
@@ -148,8 +148,8 @@ export async function PUT(
 
     // Prevent last admin from being changed to cashier
     if (updateData.role === "cashier") {
-      const adminCount = await Admin.countDocuments({ role: "admin" });
-      const currentUser = await Admin.findById(id);
+      const adminCount = await User.countDocuments({ role: "admin" });
+      const currentUser = await User.findById(id);
       if (currentUser?.role === "admin" && adminCount <= 1) {
         return NextResponse.json(
           {
@@ -161,7 +161,7 @@ export async function PUT(
       }
     }
 
-    const updatedUser = await Admin.findByIdAndUpdate(id, updateData, {
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     }).select("-password");
@@ -213,7 +213,7 @@ export async function DELETE(
     }
 
     // Prevent self-deletion
-    if (session.adminId === id) {
+    if (session.userId === id) {
       return NextResponse.json(
         { message: "You cannot delete your own account" },
         { status: 400 },
@@ -221,9 +221,9 @@ export async function DELETE(
     }
 
     // Prevent deletion of last admin
-    const user = await Admin.findById(id);
+    const user = await User.findById(id);
     if (user?.role === "admin") {
-      const adminCount = await Admin.countDocuments({ role: "admin" });
+      const adminCount = await User.countDocuments({ role: "admin" });
       if (adminCount <= 1) {
         return NextResponse.json(
           {
@@ -235,7 +235,7 @@ export async function DELETE(
       }
     }
 
-    const deletedUser = await Admin.findByIdAndDelete(id);
+    const deletedUser = await User.findByIdAndDelete(id);
 
     if (!deletedUser) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });

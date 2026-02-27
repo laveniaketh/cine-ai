@@ -12,7 +12,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
     Select,
     SelectContent,
@@ -27,7 +26,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogClose,
 } from "@/components/ui/dialog"
 import {
@@ -36,7 +34,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Search, MoreHorizontal, Pencil, Trash2, Shield, ShieldCheck, UserPlus } from "lucide-react"
+import { Search, MoreHorizontal, Pencil, Trash2, Shield, ShieldCheck } from "lucide-react"
+import AddUser from "@/components/user-management/AddUser"
+import EditUser from "@/components/user-management/EditUser"
 
 type User = {
     _id: string
@@ -70,28 +70,9 @@ const UserManagement = () => {
     const [error, setError] = useState<string | null>(null)
     const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-    // Add user dialog state
-    const [addDialogOpen, setAddDialogOpen] = useState(false)
-    const [addLoading, setAddLoading] = useState(false)
-    const [addForm, setAddForm] = useState({
-        fullName: "",
-        email: "",
-        username: "",
-        password: "",
-        role: "cashier" as string,
-    })
-
     // Edit user dialog state
     const [editDialogOpen, setEditDialogOpen] = useState(false)
-    const [editLoading, setEditLoading] = useState(false)
     const [editingUser, setEditingUser] = useState<User | null>(null)
-    const [editForm, setEditForm] = useState({
-        fullName: "",
-        email: "",
-        username: "",
-        password: "",
-        role: "cashier" as string,
-    })
 
     // Delete dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -135,76 +116,7 @@ const UserManagement = () => {
         }
     }, [error])
 
-    const handleAddUser = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setAddLoading(true)
-        setError(null)
 
-        try {
-            const response = await fetch("/api/admin/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(addForm),
-            })
-
-            const data = await response.json()
-
-            if (response.ok) {
-                setSuccessMsg("User created successfully")
-                setAddDialogOpen(false)
-                setAddForm({ fullName: "", email: "", username: "", password: "", role: "cashier" })
-                await fetchUsers()
-            } else {
-                setError(data.message)
-            }
-        } catch {
-            setError("Failed to create user")
-        } finally {
-            setAddLoading(false)
-        }
-    }
-
-    const handleEditUser = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!editingUser) return
-        setEditLoading(true)
-        setError(null)
-
-        try {
-            const payload: Record<string, string> = {}
-            if (editForm.fullName !== editingUser.fullName) payload.fullName = editForm.fullName
-            if (editForm.email !== editingUser.email) payload.email = editForm.email
-            if (editForm.username !== editingUser.username) payload.username = editForm.username
-            if (editForm.role !== editingUser.role) payload.role = editForm.role
-            if (editForm.password) payload.password = editForm.password
-
-            if (Object.keys(payload).length === 0) {
-                setEditDialogOpen(false)
-                return
-            }
-
-            const response = await fetch(`/api/admin/users/${editingUser._id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            })
-
-            const data = await response.json()
-
-            if (response.ok) {
-                setSuccessMsg("User updated successfully")
-                setEditDialogOpen(false)
-                setEditingUser(null)
-                await fetchUsers()
-            } else {
-                setError(data.message)
-            }
-        } catch {
-            setError("Failed to update user")
-        } finally {
-            setEditLoading(false)
-        }
-    }
 
     const handleDeleteUser = async () => {
         if (!deletingUser) return
@@ -235,13 +147,6 @@ const UserManagement = () => {
 
     const openEditDialog = (user: User) => {
         setEditingUser(user)
-        setEditForm({
-            fullName: user.fullName,
-            email: user.email,
-            username: user.username,
-            password: "",
-            role: user.role,
-        })
         setEditDialogOpen(true)
     }
 
@@ -366,106 +271,13 @@ const UserManagement = () => {
                 </div>
 
                 {/* Add User Button */}
-                <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-white text-black hover:bg-gray-200">
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Add User
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-neutral-900 border-neutral-700">
-                        <DialogHeader>
-                            <DialogTitle className="text-white">Add New User</DialogTitle>
-                            <DialogDescription className="text-gray-400">
-                                Create a new user account and assign their role.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleAddUser}>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label className="text-white">Full Name</Label>
-                                    <Input
-                                        value={addForm.fullName}
-                                        onChange={(e) => setAddForm(f => ({ ...f, fullName: e.target.value }))}
-                                        placeholder="Enter full name"
-                                        required
-                                        className="bg-neutral-800 border-neutral-700 text-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-white">Email</Label>
-                                    <Input
-                                        type="email"
-                                        value={addForm.email}
-                                        onChange={(e) => setAddForm(f => ({ ...f, email: e.target.value }))}
-                                        placeholder="Enter email address"
-                                        required
-                                        className="bg-neutral-800 border-neutral-700 text-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-white">Username</Label>
-                                    <Input
-                                        value={addForm.username}
-                                        onChange={(e) => setAddForm(f => ({ ...f, username: e.target.value }))}
-                                        placeholder="Enter username"
-                                        required
-                                        className="bg-neutral-800 border-neutral-700 text-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-white">Password</Label>
-                                    <Input
-                                        type="password"
-                                        value={addForm.password}
-                                        onChange={(e) => setAddForm(f => ({ ...f, password: e.target.value }))}
-                                        placeholder="Minimum 6 characters"
-                                        required
-                                        minLength={6}
-                                        className="bg-neutral-800 border-neutral-700 text-white"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-white">Role</Label>
-                                    <Select value={addForm.role} onValueChange={(v) => setAddForm(f => ({ ...f, role: v }))}>
-                                        <SelectTrigger className="bg-neutral-800 border-neutral-700 text-white">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-neutral-800 border-neutral-700">
-                                            <SelectItem value="admin">
-                                                <div className="flex items-center gap-2">
-                                                    <ShieldCheck className="h-4 w-4 text-amber-400" />
-                                                    Admin — Full access
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="cashier">
-                                                <div className="flex items-center gap-2">
-                                                    <Shield className="h-4 w-4 text-blue-400" />
-                                                    Cashier — Dashboard & Tickets
-                                                </div>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {addForm.role === "admin"
-                                            ? "Access: Dashboard, Movies, Tickets, User Management"
-                                            : "Access: Dashboard, Tickets"}
-                                    </p>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <DialogClose asChild>
-                                    <Button type="button" variant="outline" className="bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700">
-                                        Cancel
-                                    </Button>
-                                </DialogClose>
-                                <Button type="submit" className="bg-white text-black hover:bg-gray-200" disabled={addLoading}>
-                                    {addLoading ? "Creating..." : "Create User"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                <AddUser
+                    onSuccess={() => {
+                        setSuccessMsg("User created successfully")
+                        fetchUsers()
+                    }}
+                    onError={(msg) => setError(msg)}
+                />
             </div>
 
             {/* Users Table */}
@@ -567,9 +379,9 @@ const UserManagement = () => {
                     {(Object.entries(ROLE_CONFIG) as [string, typeof ROLE_CONFIG.admin][]).map(([role, config]) => {
                         const Icon = config.icon
                         return (
-                            <div key={role} className="bg-neutral-900 rounded-lg p-3 border border-neutral-700">
+                            <div key={role} className="bg-neutral-800 rounded-lg p-3 border border-neutral-700">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <Icon className="h-4 w-4" />
+                                    <Icon className="h-4 w-4 text-white" />
                                     <span className="text-white font-medium">{config.label}</span>
                                 </div>
                                 <div className="flex flex-wrap gap-1">
@@ -586,96 +398,17 @@ const UserManagement = () => {
             </div>
 
             {/* Edit User Dialog */}
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent className="bg-neutral-900 border-neutral-700">
-                    <DialogHeader>
-                        <DialogTitle className="text-white">Edit User</DialogTitle>
-                        <DialogDescription className="text-gray-400">
-                            Update user details and role for {editingUser?.fullName}.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleEditUser}>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label className="text-white">Full Name</Label>
-                                <Input
-                                    value={editForm.fullName}
-                                    onChange={(e) => setEditForm(f => ({ ...f, fullName: e.target.value }))}
-                                    required
-                                    className="bg-neutral-800 border-neutral-700 text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-white">Email</Label>
-                                <Input
-                                    type="email"
-                                    value={editForm.email}
-                                    onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))}
-                                    required
-                                    className="bg-neutral-800 border-neutral-700 text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-white">Username</Label>
-                                <Input
-                                    value={editForm.username}
-                                    onChange={(e) => setEditForm(f => ({ ...f, username: e.target.value }))}
-                                    required
-                                    className="bg-neutral-800 border-neutral-700 text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-white">New Password (leave blank to keep current)</Label>
-                                <Input
-                                    type="password"
-                                    value={editForm.password}
-                                    onChange={(e) => setEditForm(f => ({ ...f, password: e.target.value }))}
-                                    placeholder="••••••••"
-                                    minLength={6}
-                                    className="bg-neutral-800 border-neutral-700 text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-white">Role</Label>
-                                <Select value={editForm.role} onValueChange={(v) => setEditForm(f => ({ ...f, role: v }))}>
-                                    <SelectTrigger className="bg-neutral-800 border-neutral-700 text-white">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-neutral-800 border-neutral-700">
-                                        <SelectItem value="admin">
-                                            <div className="flex items-center gap-2">
-                                                <ShieldCheck className="h-4 w-4 text-amber-400" />
-                                                Admin — Full access
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="cashier">
-                                            <div className="flex items-center gap-2">
-                                                <Shield className="h-4 w-4 text-blue-400" />
-                                                Cashier — Dashboard & Tickets
-                                            </div>
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    {editForm.role === "admin"
-                                        ? "Access: Dashboard, Movies, Tickets, User Management"
-                                        : "Access: Dashboard, Tickets"}
-                                </p>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="outline" className="bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700">
-                                    Cancel
-                                </Button>
-                            </DialogClose>
-                            <Button type="submit" className="bg-white text-black hover:bg-gray-200" disabled={editLoading}>
-                                {editLoading ? "Saving..." : "Save Changes"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <EditUser
+                user={editingUser}
+                open={editDialogOpen}
+                onOpenChange={setEditDialogOpen}
+                onSuccess={() => {
+                    setSuccessMsg("User updated successfully")
+                    setEditingUser(null)
+                    fetchUsers()
+                }}
+                onError={(msg) => setError(msg)}
+            />
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
