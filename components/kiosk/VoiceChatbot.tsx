@@ -1,23 +1,13 @@
 // components/kiosk/VoiceChatbot.tsx
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Vapi from "@vapi-ai/web";
 import { MessageCircle, Mic, MicOff, X, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_WEB_TOKEN!);
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Movie {
     _id: string;
     movieTitle: string;
@@ -42,518 +32,430 @@ interface ReservedSeat {
     paymentStatus: string;
 }
 
+interface Message {
+    id: number;
+    role: "user" | "assistant";
+    text: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatTo12Hour = (time: string): string => {
+    const [hourStr, minuteStr] = time.split(":");
+    let hour = parseInt(hourStr, 10);
+    const minute = minuteStr.padStart(2, "0");
+    const ampm = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12 || 12;
+    return `${hour}:${minute} ${ampm}`;
+};
+
+const getCurrentDayAndWeek = () => {
+    const now = new Date();
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return {
+        currentDayOfWeek: days[now.getDay()],
+        currentWeekNumber: `Week ${Math.ceil(now.getDate() / 7)}`,
+    };
+};
+
 export default function VoiceChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
-    const [transcript, setTranscript] = useState<string[]>([]);
-    const [movies, setMovies] = useState<Movie[]>([]);
-    const [moviesWithSeats, setMoviesWithSeats] = useState<MovieWithSeats[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(false);
-    const transcriptEndRef = useRef<HTMLDivElement>(null);
-    const scrollAreaRef = useRef<HTMLDivElement>(null);
-    const transcriptTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [moviesWithSeats, setMoviesWithSeats] = useState<MovieWithSeats[]>([]);
 
-    // Notify VoiceNavigation about chatbot state changes
+    const msgIdRef = useRef(0);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
+
     useEffect(() => {
-        // Dispatch custom event to notify VoiceNavigation
-        const event = new CustomEvent('voiceChatbotStateChange', {
-            detail: { isOpen }
-        });
-        window.dispatchEvent(event);
+        window.dispatchEvent(
+            new CustomEvent("voiceChatbotStateChange", { detail: { isOpen } })
+        );
     }, [isOpen]);
 
     useEffect(() => {
-        // Auto-scroll to bottom when new messages arrive
-        if (scrollAreaRef.current) {
-            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-            if (scrollContainer) {
-                scrollContainer.scrollTop = scrollContainer.scrollHeight;
-            }
-        }
-    }, [transcript]);
+        if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    }, [messages]);
 
-    // Auto-clear transcript after 5 minutes of inactivity
     useEffect(() => {
-        // Clear any existing timer
-        if (transcriptTimerRef.current) {
-            clearTimeout(transcriptTimerRef.current);
-        }
-
-        // Only set timer if there's a transcript and chat is open
-        if (transcript.length > 0 && isOpen) {
-            transcriptTimerRef.current = setTimeout(() => {
-                console.log("Auto-clearing transcript after 5 minutes of inactivity");
-                setTranscript([]);
-                // Stop listening if currently active
-                if (isListening) {
-                    stopListening();
-                }
-            }, 5 * 60 * 1000); // 5 minutes in milliseconds
-        }
-
-        // Cleanup function
+        if (messages.length === 0 || !isOpen) return;
+        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+        inactivityTimer.current = setTimeout(() => {
+            setMessages([]);
+            if (isListening) stopListening();
+        }, 5 * 60 * 1000);
         return () => {
-            if (transcriptTimerRef.current) {
-                clearTimeout(transcriptTimerRef.current);
-            }
+            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
         };
-    }, [transcript, isOpen, isListening]);
+    }, [messages, isOpen]);
 
-    useEffect(() => {
-        if (isOpen && movies.length === 0) {
-            fetchAllData();
+    // ── Fetch movie + seat data 
+    const fetchAllData = useCallback(async () => {
+        const isInitial = moviesWithSeats.length === 0;
+        if (isInitial) setIsLoadingData(true);
+        try {
+            const res = await fetch("/api/movies");
+            const data = await res.json();
+            if (!data.movies?.length) return;
+
+            const { currentDayOfWeek, currentWeekNumber } = getCurrentDayAndWeek();
+            const totalSeats = 94;
+
+            const enriched = await Promise.all(
+                data.movies.map(async (movie: Movie) => {
+                    try {
+                        const sr = await fetch(
+                            `/api/tickets/seats?movie_id=${movie._id}&dayOfWeek=${currentDayOfWeek}&weekNumber=${currentWeekNumber}`
+                        );
+                        const sd = await sr.json();
+                        const reserved = (sd.reservedSeats || [])
+                            .filter((s: ReservedSeat) => s.paymentStatus === "paid" || s.paymentStatus === "pending")
+                            .map((s: ReservedSeat) => s.seatNumber);
+                        return { ...movie, availableSeats: totalSeats - reserved.length, totalSeats, reservedSeats: reserved };
+                    } catch {
+                        return { ...movie, availableSeats: totalSeats, totalSeats, reservedSeats: [] };
+                    }
+                })
+            );
+            setMoviesWithSeats(enriched);
+        } catch (err) {
+            console.error("Error fetching data:", err);
+        } finally {
+            if (isInitial) setIsLoadingData(false);
         }
-    }, [isOpen]);
+    }, [moviesWithSeats.length]);
 
-    // Auto-refresh data every 1 minute when chat is open
+    // Fetch on open + refresh every 60s
     useEffect(() => {
         if (!isOpen) return;
-
-        // Fetch data immediately when opened
         fetchAllData();
-
-        // Set up interval to refresh every 60 seconds (1 minute)
-        const intervalId = setInterval(() => {
-            console.log("Auto-refreshing movie and seat data...");
-            fetchAllData();
-        }, 60000); // 60000ms = 1 minute
-
-        // Cleanup interval on unmount or when chat closes
-        return () => {
-            clearInterval(intervalId);
-        };
+        const iv = setInterval(fetchAllData, 60000);
+        return () => clearInterval(iv);
     }, [isOpen]);
 
+    // Build system prompt
+    const buildSystemPrompt = useCallback(() => {
+        const { currentDayOfWeek, currentWeekNumber } = getCurrentDayAndWeek();
+        const moviesInfo = moviesWithSeats.map(m => {
+            return `**${m.movieTitle}**
+- Year: ${m.releasedYear}
+- Duration: ${m.duration} minutes
+- Director: ${m.director}
+- Showtime: ${formatTo12Hour(m.timeslot)}
+- Available Seats: ${m.availableSeats} out of ${m.totalSeats}
+- Summary: ${m.summary}`;
+        }).join("\n\n");
+
+        return `You are CineAI Assistant, a helpful voice chatbot for a movie theater kiosk.
+
+IMPORTANT INFORMATION:
+- Ticket Price: 200 pesos per ticket (fixed for all movies)
+- Current Day: ${currentDayOfWeek} (${currentWeekNumber})
+- No outside food/drinks allowed inside the theater
+- No filming or photography inside the theater
+
+AVAILABLE MOVIES (${moviesWithSeats.length} showing today):
+${moviesInfo}
+
+TRANSCRIPT CORRECTION:
+You receive speech-to-text transcripts which may contain mishears. Silently correct obvious errors using context:
+- "sine AI" / "sinai" / "cinema AI" / "sign AI" → CineAI
+- "time slot" / "time's lot" / "time slut" → timeslot
+- "show time" / "show-time" → showtime
+- "peso" / "pesos" / "peto" / "pay so" → pesos
+- "seat" / "sit" / "feet" → seat
+- "cashier" / "cash ear" / "cash here" → cashier
+- "booking" / "looking" / "cooking" → booking
+- Any movie title that sounds phonetically close → correct to the actual title from the list above
+Never mention or point out transcript errors to the user. Just respond naturally using the corrected interpretation.
+
+GUIDELINES:
+1. Be friendly, warm, and conversational — not robotic
+2. Keep responses brief (2–3 sentences max)
+3. Always use 12-hour time format
+4. Mention seat availability when discussing specific movies
+5. After kiosk booking → proceed to cashier to pay and collect tickets
+6. No snacks sold; outside food not allowed
+7. Do NOT greet or speak first — wait for the user to ask something
+8. Only end the conversation when the user clearly indicates they are done
+9. If a question is unclear due to audio quality, make your best interpretation and answer — do not ask the user to repeat themselves`;
+    }, [moviesWithSeats]);
+
     useEffect(() => {
-        const handleCallStart = () => {
+        const onCallStart = () => {
             setIsConnecting(false);
             setIsListening(true);
         };
 
-        const handleCallEnd = () => {
+        const onCallEnd = () => {
             setIsListening(false);
             setIsConnecting(false);
         };
 
-        const handleMessage = (message: any) => {
-            if (message.type === "transcript" && message.transcriptType === "final") {
-                const role = message.role === "user" ? "You" : "Assistant";
-                const text = message.transcript || "";
-                setTranscript(prev => [...prev, `${role}: ${text}`]);
+        const onMessage = (msg: any) => {
+            if (msg.type !== "transcript") return;
+            const text: string = msg.transcript || "";
+            if (!text.trim()) return;
+
+            if (msg.transcriptType === "partial" && msg.role === "user") {
+                // Show live partial transcript as a temporary "typing" bubble
+                setMessages(prev => {
+                    const last = prev[prev.length - 1];
+                    // If the last message is already a partial from user, replace it
+                    if (last && last.role === "user" && last.id === -1) {
+                        return [...prev.slice(0, -1), { id: -1, role: "user", text }];
+                    }
+                    return [...prev, { id: -1, role: "user", text }];
+                });
+            }
+
+            if (msg.transcriptType === "final") {
+                setMessages(prev => {
+                    // Remove any pending partial bubble first
+                    const withoutPartial = prev.filter(m => m.id !== -1);
+                    return [
+                        ...withoutPartial,
+                        { id: ++msgIdRef.current, role: msg.role === "user" ? "user" : "assistant", text },
+                    ];
+                });
             }
         };
 
-        const handleError = (error: any) => {
-            console.error("Vapi error:", error);
+        const onError = (err: any) => {
+            // Stringify so empty objects {} are readable in the console
+            const detail = err && typeof err === "object"
+                ? JSON.stringify(err, Object.getOwnPropertyNames(err))
+                : String(err);
+            console.error("Vapi error:", detail || "(no detail returned)");
             setIsListening(false);
             setIsConnecting(false);
         };
 
-        // Add event listeners
-        vapi.on("call-start", handleCallStart);
-        vapi.on("call-end", handleCallEnd);
-        vapi.on("message", handleMessage);
-        vapi.on("error", handleError);
+        vapi.on("call-start", onCallStart);
+        vapi.on("call-end", onCallEnd);
+        vapi.on("message", onMessage);
+        vapi.on("error", onError);
 
-        // Cleanup function to remove event listeners
         return () => {
-            vapi.off("call-start", handleCallStart);
-            vapi.off("call-end", handleCallEnd);
-            vapi.off("message", handleMessage);
-            vapi.off("error", handleError);
+            vapi.off("call-start", onCallStart);
+            vapi.off("call-end", onCallEnd);
+            vapi.off("message", onMessage);
+            vapi.off("error", onError);
         };
     }, []);
 
-    // Helper function to convert 24-hour time to 12-hour format
-    const formatTo12Hour = (time: string): string => {
-        const [hourStr, minuteStr] = time.split(":");
-        let hour = parseInt(hourStr, 10);
-        const minute = minuteStr.padStart(2, "0");
-        const ampm = hour >= 12 ? "PM" : "AM";
-        hour = hour % 12 || 12;
-        return `${hour}:${minute} ${ampm}`;
-    };
-
-    // Helper function to get current day and week
-    const getCurrentDayAndWeek = () => {
-        const now = new Date();
-        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        const currentDayOfWeek = days[now.getDay()];
-        const dayOfMonth = now.getDate();
-        const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
-        return { currentDayOfWeek, currentWeekNumber };
-    };
-
-    // Fetch all movies and their seat availability
-    const fetchAllData = async () => {
-        // Don't show loading spinner on subsequent fetches (auto-refresh)
-        const isInitialLoad = moviesWithSeats.length === 0;
-        if (isInitialLoad) {
-            setIsLoadingData(true);
-        }
-
-        try {
-            // Fetch movies
-            const moviesResponse = await fetch('/api/movies');
-            const moviesData = await moviesResponse.json();
-
-            if (moviesData.movies && moviesData.movies.length > 0) {
-                setMovies(moviesData.movies);
-
-                // Fetch seat availability for each movie
-                const { currentDayOfWeek, currentWeekNumber } = getCurrentDayAndWeek();
-                const totalSeats = 94;
-
-                const moviesWithSeatData = await Promise.all(
-                    moviesData.movies.map(async (movie: Movie) => {
-                        try {
-                            const seatsResponse = await fetch(
-                                `/api/tickets/seats?movie_id=${movie._id}&dayOfWeek=${currentDayOfWeek}&weekNumber=${currentWeekNumber}`
-                            );
-                            const seatsData = await seatsResponse.json();
-
-                            const reservedSeatsList = (seatsData.reservedSeats || [])
-                                .filter((seat: ReservedSeat) =>
-                                    seat.paymentStatus === 'paid' || seat.paymentStatus === 'pending'
-                                )
-                                .map((seat: ReservedSeat) => seat.seatNumber);
-
-                            const availableSeats = totalSeats - reservedSeatsList.length;
-
-                            return {
-                                ...movie,
-                                availableSeats,
-                                totalSeats,
-                                reservedSeats: reservedSeatsList
-                            };
-                        } catch (error) {
-                            console.error(`Error fetching seats for ${movie.movieTitle}:`, error);
-                            return {
-                                ...movie,
-                                availableSeats: totalSeats,
-                                totalSeats,
-                                reservedSeats: []
-                            };
-                        }
-                    })
-                );
-
-                setMoviesWithSeats(moviesWithSeatData);
-
-                // Log when data is refreshed (except initial load)
-                if (!isInitialLoad) {
-                    console.log(`Data refreshed at ${new Date().toLocaleTimeString()}: ${moviesWithSeatData.length} movies updated`);
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching data:", error);
-        } finally {
-            if (isInitialLoad) {
-                setIsLoadingData(false);
-            }
-        }
-    };
-
-    const buildSystemPrompt = () => {
-        const { currentDayOfWeek, currentWeekNumber } = getCurrentDayAndWeek();
-
-        const moviesInfo = moviesWithSeats.map(movie => {
-            const timeslot12hr = formatTo12Hour(movie.timeslot);
-            const seatInfo = `Available Seats: ${movie.availableSeats} out of ${movie.totalSeats}`;
-
-            return `**${movie.movieTitle}**
-- Year: ${movie.releasedYear}
-- Duration: ${movie.duration} minutes
-- Director: ${movie.director}
-- Showtime: ${timeslot12hr}
-- ${seatInfo}
-- Summary: ${movie.summary}`;
-        }).join('\n\n');
-
-        return `You are CineAI Assistant, a helpful voice chatbot for a movie theater kiosk. You help customers with information about movies, showtimes, pricing, and seat availability.
-
-IMPORTANT INFORMATION:
-- Ticket Price: 200 pesos per ticket (fixed price for all movies and showtimes)
-- Current Day: ${currentDayOfWeek}
-- Current Week: ${currentWeekNumber}
-- Cinema Policy: Outside food and drinks are not allowed inside the theater
-- Cinema Policy: Customer are prohibited from filming or taking photos inside the theater
-
-AVAILABLE MOVIES AND SEAT AVAILABILITY (${moviesWithSeats.length} movies showing today):
-
-${moviesInfo}
-
-GUIDELINES FOR RESPONDING:
-1. Be friendly, warm, and conversational - speak naturally like a helpful person
-2. Keep responses brief (2-3 sentences maximum) to maintain natural conversation flow
-3. Always format showtimes in 12-hour format (e.g., "2:30 PM")
-4. When mentioning seat availability, be specific: "[X] seats available out of [Total]"
-5. All information is already provided above - no need to search or call functions
-6. If asked about a movie, mention its showtime and seat availability together
-7. Always ask if they need help with anything else before ending the conversation
-8. Never say goodbye unless the user clearly indicates they're done
-9. If the user asks something outside your scope, politely inform them you can only assist with movie and theater-related questions
-10. When they want to buy ticket, tell them to proceed to their screen to complete the booking process
-11. When ask where do they pay the ticket after booking in the kiosk, tell them to proceed to the facility's cashier counter to make the payment and collect their tickets
-12. When asked about snacks or food, inform them about the no food policy and we don't sell snacks in the theater
-
-
-RESPONSE EXAMPLES:
-User: "What movies are showing?"
-You: "We have [X] great films today! [List 2-3 with showtimes]. Which one interests you?"
-
-User: "Tell me about [Movie Name]"
-You: "[Movie] is a [duration]-minute film by [director] showing at [time]. [Brief 1-sentence plot]. We have [X] seats available. Would you like to know more?"
-
-User: "What time is [Movie] showing?"
-You: "[Movie] is showing at [time], and we currently have [X] seats available out of [total]."
-
-User: "Are seats available for [Movie]?"
-You: "Yes! For [Movie] at [time], we have [X] seats available out of [total]. Would you like to proceed with booking?"
-
-User: "How much are tickets?"
-You: "Tickets are 200 pesos each for all movies and showtimes. Is there a specific movie you'd like to watch?"
-
-User: "Can I bring snacks?"
-You: "I'm sorry, but outside food and drinks aren't allowed in the theater. However, we have concessions available! Can I help you choose a movie?"
-
-IMPORTANT REMINDERS:
-- Always be conversational and natural - avoid sounding robotic
-- Keep responses short and engaging
-- Include seat availability when discussing specific movies
-- Use 12-hour time format (AM/PM)
-- Ask follow-up questions to keep the conversation going
-- Only end with goodbye if the user clearly indicates they're finished`;
-    };
-
     const startListening = async () => {
         if (isListening || isConnecting) return;
-
-        // Ensure data is loaded
-        if (moviesWithSeats.length === 0) {
-            await fetchAllData();
-        }
-
-        // Wait a bit to ensure data is fully loaded
-        if (moviesWithSeats.length === 0) {
-            console.error("Failed to load movie data");
-            return;
-        }
+        if (moviesWithSeats.length === 0) await fetchAllData();
 
         try {
             setIsConnecting(true);
-            // DO NOT clear transcript here - preserve existing conversation
-
             await vapi.start({
                 model: {
                     provider: "openai",
                     model: "gpt-4",
-                    messages: [
-                        {
-                            role: "system",
-                            content: buildSystemPrompt()
-                        }
-                    ]
+                    messages: [{ role: "system", content: buildSystemPrompt() }],
                 },
-                voice: {
-                    provider: "11labs",
-                    voiceId: "21m00Tcm4TlvDq8ikWAM"
-                },
-                name: "CineAI Chatbot Assistant",
-                firstMessage: transcript.length === 0
-                    ? "Hi! Welcome to CineAI. I am an AI chatbot here to assist you with movie information, showtimes,ticket booking, and more about our theater. How can I help you today?"
-                    : "I'm back and ready to help! What else would you like to know?",
+                voice: { provider: "11labs", voiceId: "21m00Tcm4TlvDq8ikWAM" },
+                name: "CineAI Chatbot",
+                // No firstMessage — assistant waits silently for the user to speak first
                 transcriber: {
                     provider: "deepgram",
-                    model: "nova-2",
-                    language: "en"
+                    model: "nova-2-general", // nova-2-general is tuned for conversational speech
+                    language: "en-US",
                 },
                 recordingEnabled: false,
                 endCallFunctionEnabled: false,
                 clientMessages: ["transcript", "hang", "speech-update"],
-                serverMessages: ["end-of-call-report", "hang", "speech-update"]
+                serverMessages: ["end-of-call-report", "hang", "speech-update"],
             });
-
-        } catch (error) {
-            console.error("Error starting chatbot:", error);
+        } catch (err) {
+            console.error("Error starting chatbot:", err);
             setIsConnecting(false);
             setIsListening(false);
         }
     };
+
 
     const stopListening = async () => {
         try {
             await vapi.stop();
-            setIsListening(false);
-            setIsConnecting(false);
-            // Transcript is preserved - no clearing here
-        } catch (error) {
-            console.error("Error stopping chatbot:", error);
+        } catch (err) {
+            console.error("Error stopping chatbot:", err);
         }
+        setIsListening(false);
+        setIsConnecting(false);
     };
 
     const closeChat = async () => {
-        if (isListening) {
-            await stopListening();
-        }
+        if (isListening) await stopListening();
         setIsOpen(false);
-        // Keep transcript intact even when closing chat window
-        // If you want to clear on close, uncomment the line below:
-        // setTranscript([]);
+    };
+
+    const toggleMic = () => {
+        if (isListening) stopListening();
+        else startListening();
     };
 
 
     return (
         <>
-            {/* Floating Chatbot Button */}
+
             {!isOpen && (
-                <Button
+                <button
                     onClick={() => setIsOpen(true)}
-                    size="lg"
-                    className="fixed top-6 left-6 z-50 h-14 w-14 rounded-full"
-                    variant="default"
+                    title="Open CineAI Chatbot"
+                    className="
+                        fixed top-6 left-6 z-50
+                        h-12 w-12 rounded-full
+                        bg-black/60 backdrop-blur-md border border-white/20
+                        flex items-center justify-center
+                        shadow-lg hover:bg-black/80
+                        transition-all duration-200 hover:scale-110 active:scale-95
+                    "
                 >
-                    <MessageCircle className="h-6 w-6" />
-                </Button>
+                    <MessageCircle className="h-5 w-5 text-white/80" />
+                </button>
             )}
 
-            {/* Chat Window */}
+
             {isOpen && (
-                <Card className="fixed top-6 left-6 z-50 w-96 h-[580px] flex flex-col shadow-xl py-6 gap-2 bg-neutral-800 border-neutral-700">
-                    {/* Header */}
-                    <CardHeader className="text-primary-foreground">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-neutral-600 flex items-center justify-center">
-                                    <MessageCircle className="h-5 w-5 text-neutral-500" />
-                                </div>
-                                <div>
-                                    <CardTitle className="text-lg text-white">CineAI Assistant</CardTitle>
-                                    <CardDescription className="text-xs text-primary-foreground/80">
-                                        {isLoadingData ? (
-                                            "Loading data..."
-                                        ) : isListening ? (
-                                            <Badge variant="secondary" className="px-2 py-0">Listening</Badge>
-                                        ) : isConnecting ? (
-                                            <Badge variant="secondary" className="px-2 py-0">Connecting</Badge>
-                                        ) : (
-                                            <Badge variant="default" className="px-2 py-0">Online</Badge>
-                                        )}
-                                    </CardDescription>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
+                <div className="
+                    fixed top-6 left-6 z-50
+                    w-96 flex flex-col
+                    pointer-events-auto
+                    max-h-[calc(100vh-48px)]
+                "
+                >
 
-                                <Button
-                                    onClick={closeChat}
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8 text-white"
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <div className="flex items-center gap-2">
+                            {/* Status dot */}
+                            <span className={`
+                                h-2 w-2 rounded-full
+                                ${isListening
+                                    ? "bg-emerald-400 shadow-[0_0_6px_2px_rgba(52,211,153,0.5)]"
+                                    : isConnecting
+                                        ? "bg-amber-400 animate-pulse"
+                                        : "bg-white/30"
+                                }
+                            `} />
+                            <span className="text-white/70 text-xs font-medium tracking-wide">
+                                {isListening ? "Listening" : isConnecting ? "Connecting..." : "CineAI Chatbot"}
+                            </span>
                         </div>
-                    </CardHeader>
 
-                    {/* Transcript Area */}
-                    <CardContent className="flex-1 p-4 min-h-0">
-                        <ScrollArea ref={scrollAreaRef} className="h-full w-full rounded-md border bg-neutral-800/30">
-                            <div className="p-4">
-                                {isLoadingData ? (
-                                    <div className="flex flex-col items-center justify-center min-h-[300px] text-muted-foreground">
-                                        <Loader2 className="h-12 w-12 mb-3 animate-spin text-primary" />
-                                        <p className="text-sm">Loading movie information...</p>
-                                    </div>
-                                ) : transcript.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center min-h-[300px] text-center text-muted-foreground">
-                                        <MessageCircle className="h-12 w-12 mb-3 text-muted-foreground/50" />
-                                        <p className="text-sm font-medium mb-1">Ready to assist you</p>
-                                        <p className="text-xs mb-3">Click &quot;Start Listening&quot; to begin</p>
-                                        {moviesWithSeats.length > 0 && (
-                                            <div className="flex flex-col items-center gap-1">
-                                                <p className="text-xs text-muted-foreground/60 mt-1">
-                                                    Auto-refreshing every minute
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {transcript.map((text, index) => {
-                                            const isUser = text.startsWith("You:");
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                                >
-                                                    <div
-                                                        className={`max-w-[85%] px-4 py-2 rounded-lg ${isUser
-                                                            ? "bg-primary text-primary-foreground"
-                                                            : "bg-secondary text-secondary-foreground"
-                                                            }`}
-                                                    >
-                                                        <p className="text-sm leading-relaxed">
-                                                            {text.replace(/^(You|Assistant):\s*/, "")}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        <div ref={transcriptEndRef} />
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                    </CardContent>
+                        {/* Close button */}
+                        <button
+                            onClick={closeChat}
+                            className="
+                                h-7 w-7 rounded-full
+                                bg-white/10 hover:bg-white/20
+                                flex items-center justify-center
+                                transition-colors duration-150
+                            "
+                        >
+                            <X className="h-3.5 w-3.5 text-white/60" />
+                        </button>
+                    </div>
 
-                    {/* Controls */}
-                    <CardFooter className="flex flex-col gap-2 pt-3">
-                        {!isListening && !isConnecting ? (
-                            <Button
-                                onClick={startListening}
-                                disabled={isLoadingData || moviesWithSeats.length === 0}
-                                className="w-full"
-                                size="lg"
-                            >
-                                <Mic className="h-4 w-4 mr-2" />
-                                {transcript.length > 0 ? "Resume Listening" : moviesWithSeats.length === 0 ? "Loading..." : "Start Listening"}
-                            </Button>
-                        ) : (
-                            <Button
-                                onClick={stopListening}
-                                disabled={isConnecting}
-                                variant="destructive"
-                                className="w-full"
-                                size="lg"
-                            >
-                                {isConnecting ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Connecting...
-                                    </>
-                                ) : (
-                                    <>
-                                        <MicOff className="h-4 w-4 mr-2" />
-                                        Stop Listening
-                                    </>
-                                )}
-                            </Button>
-                        )}
+                    <div
+                        ref={scrollRef}
+                        className="flex-1 overflow-y-auto min-h-0 relative max-h-[480px] [mask-image:linear-gradient(to_bottom,transparent_0%,black_18%,black_82%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_18%,black_82%,transparent_100%)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                        <div className="flex flex-col-reverse gap-2 px-1 py-2">
 
-                        {isListening && (
-                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                                <div className="flex gap-1">
-                                    <div className="w-1 h-3 bg-primary rounded animate-pulse" style={{ animationDelay: "0ms" }} />
-                                    <div className="w-1 h-3 bg-primary rounded animate-pulse" style={{ animationDelay: "150ms" }} />
-                                    <div className="w-1 h-3 bg-primary rounded animate-pulse" style={{ animationDelay: "300ms" }} />
+                            {/* Empty state */}
+                            {messages.length === 0 && (
+                                <div className="flex flex-col items-start gap-1 py-2">
+                                    {isLoadingData ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl rounded-tl-sm bg-white/10 backdrop-blur-sm border border-white/10">
+                                            <Loader2 className="h-3.5 w-3.5 text-white/50 animate-spin" />
+                                            <span className="text-white/50 text-xs">Loading the chatbot response...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="px-3 py-2 rounded-2xl rounded-tl-sm bg-white/10 backdrop-blur-sm border border-white/10 max-w-[85%]">
+                                            <p className="text-white/60 text-xs leading-relaxed">
+                                                Tap the mic and ask anything about movies, showtimes, or seats.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
-                                <span>Microphone active</span>
+                            )}
+
+                            {/* Messages — rendered in reverse (newest first in DOM) */}
+                            {[...messages].reverse().map((msg) => (
+                                <div
+                                    key={msg.id}
+                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} ${msg.id === -1 ? "opacity-50" : "opacity-100"} transition-opacity duration-150`}
+                                >
+                                    <div className={`
+                                        max-w-[85%] px-3 py-2 rounded-2xl text-xs leading-relaxed
+                                        ${msg.role === "user"
+                                            ? "rounded-tr-sm bg-emerald-500/80 backdrop-blur-sm text-white border border-emerald-400/30"
+                                            : "rounded-tl-sm bg-white/10 backdrop-blur-sm text-white/85 border border-white/10"
+                                        }
+                                        ${msg.id === -1 ? "italic" : ""}
+                                    `}>
+                                        {msg.text}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-start mt-3 px-1 relative">
+                        <button
+                            onClick={toggleMic}
+                            disabled={isConnecting && !isListening}
+                            title={isListening ? "Stop mic" : "Start mic"}
+                            className={`
+                                relative h-11 w-11 rounded-full
+                                flex items-center justify-center
+                                shadow-lg transition-all duration-200
+                                hover:scale-110 active:scale-95
+                                disabled:opacity-40 disabled:cursor-not-allowed
+                                ${isListening
+                                    ? "bg-red-500 border border-red-400/50"
+                                    : isConnecting
+                                        ? "bg-amber-500 border border-amber-400/50"
+                                        : "bg-black/60 backdrop-blur-md border border-white/20 hover:bg-black/80"
+                                }
+                            `}
+                        >
+                            {isConnecting && !isListening ? (
+                                <Loader2 className="h-4 w-4 text-white animate-spin" />
+                            ) : isListening ? (
+                                <MicOff className="h-4 w-4 text-white" />
+                            ) : (
+                                <Mic className="h-4 w-4 text-white/80" />
+                            )}
+
+                            {/* Pulse ring when mic is live */}
+                            {isListening && (
+                                <span className="absolute inset-0 rounded-full bg-red-400 opacity-30 animate-ping" />
+                            )}
+                        </button>
+
+                        {/* Live voice bars shown next to mic when listening */}
+                        {isListening && (
+                            <div className="flex gap-0.5 items-end h-4 ml-3">
+                                {[0, 150, 300, 150, 0].map((delay, i) => (
+                                    <div
+                                        key={i}
+                                        className="w-0.5 rounded-full bg-emerald-400"
+                                        style={{
+                                            animation: `voiceBar 0.7s ease-in-out infinite alternate ${delay}ms`,
+                                            height: "100%",
+                                        }}
+                                    />
+                                ))}
                             </div>
                         )}
-                    </CardFooter>
-                </Card>
+                    </div>
+                </div>
             )}
         </>
     );

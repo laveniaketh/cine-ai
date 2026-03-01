@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Movie from "@/database/movie.model";
 import { v2 as cloudinary } from "cloudinary";
+import { sanitizeString, validateImageUpload } from "@/lib/sanitize";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
     await connectDB();
@@ -20,20 +21,20 @@ export async function GET(
 
     return NextResponse.json(
       { message: "Movie fetched successfully", movie },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     console.error(e);
     return NextResponse.json(
       { message: "Movie fetch failed", error: e },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
     await connectDB();
@@ -46,21 +47,21 @@ export async function PUT(
     if (!existingMovie) {
       return NextResponse.json(
         { message: "Movie not found heheh" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     let updateData: any = {};
 
-    // Extract text fields
-    const movieTitle = formData.get("movieTitle") as string;
-    const director = formData.get("director") as string;
-    const releasedYear = formData.get("releasedYear") as string;
-    const duration = formData.get("duration") as string;
-    const summary = formData.get("summary") as string;
-    const timeslot = formData.get("timeslot") as string;
-    const month = formData.get("month") as string;
-    const week = formData.get("week") as string;
+    // Extract and sanitize text fields
+    const movieTitle = sanitizeString(formData.get("movieTitle"));
+    const director = sanitizeString(formData.get("director"));
+    const releasedYear = sanitizeString(formData.get("releasedYear"));
+    const duration = sanitizeString(formData.get("duration"));
+    const summary = sanitizeString(formData.get("summary"));
+    const timeslot = sanitizeString(formData.get("timeslot"));
+    const month = sanitizeString(formData.get("month"));
+    const week = sanitizeString(formData.get("week"));
 
     // Update fields if provided
     if (movieTitle) updateData.movieTitle = movieTitle;
@@ -75,6 +76,14 @@ export async function PUT(
     // Handle poster upload if new file provided
     const posterFile = formData.get("poster") as File;
     if (posterFile && posterFile.size > 0) {
+      const posterValidation = await validateImageUpload(posterFile);
+      if (!posterValidation.valid) {
+        return NextResponse.json(
+          { message: `Poster: ${posterValidation.error}` },
+          { status: 400 },
+        );
+      }
+
       const posterBuffer = Buffer.from(await posterFile.arrayBuffer());
       const posterUpload = await new Promise((resolve, reject) => {
         cloudinary.uploader
@@ -83,7 +92,7 @@ export async function PUT(
             (error, result) => {
               if (error) reject(error);
               else resolve(result);
-            }
+            },
           )
           .end(posterBuffer);
       });
@@ -93,6 +102,14 @@ export async function PUT(
     // Handle preview upload if new file provided
     const previewFile = formData.get("preview") as File;
     if (previewFile && previewFile.size > 0) {
+      const previewValidation = await validateImageUpload(previewFile);
+      if (!previewValidation.valid) {
+        return NextResponse.json(
+          { message: `Preview: ${previewValidation.error}` },
+          { status: 400 },
+        );
+      }
+
       const previewBuffer = Buffer.from(await previewFile.arrayBuffer());
       const previewUpload = await new Promise((resolve, reject) => {
         cloudinary.uploader
@@ -101,7 +118,7 @@ export async function PUT(
             (error, result) => {
               if (error) reject(error);
               else resolve(result);
-            }
+            },
           )
           .end(previewBuffer);
       });
@@ -116,7 +133,7 @@ export async function PUT(
 
     return NextResponse.json(
       { message: "Movie updated successfully", movie: updatedMovie },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     console.error(e);
@@ -125,14 +142,14 @@ export async function PUT(
         message: "Movie update failed",
         error: e instanceof Error ? e.message : "Unknown",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
     await connectDB();
@@ -148,7 +165,7 @@ export async function DELETE(
 
     return NextResponse.json(
       { message: "Movie deleted successfully", movie: deletedMovie },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     console.error(e);
@@ -157,7 +174,7 @@ export async function DELETE(
         message: "Movie deletion failed",
         error: e instanceof Error ? e.message : "Unknown",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -3,21 +3,30 @@ import connectDB from "@/lib/mongodb";
 import Ticket from "@/database/ticket.model";
 import ReservedSeat from "@/database/reservedSeat.model";
 import Payment from "@/database/payment.model";
+import { sanitizeString } from "@/lib/sanitize";
 
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    // Get movie_id from query parameters
+    // Get query parameters and sanitize
     const { searchParams } = new URL(req.url);
-    const movie_id = searchParams.get("movie_id");
-    const dayOfWeek = searchParams.get("dayOfWeek");
-    const weekNumber = searchParams.get("weekNumber");
+    const movie_id = sanitizeString(searchParams.get("movie_id"));
+    const dayOfWeek = sanitizeString(searchParams.get("dayOfWeek"));
+    const weekNumber = sanitizeString(searchParams.get("weekNumber"));
 
     if (!movie_id) {
       return NextResponse.json(
         { message: "movie_id is required" },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    // Validate movie_id is a valid MongoDB ObjectId format
+    if (!/^[a-fA-F0-9]{24}$/.test(movie_id)) {
+      return NextResponse.json(
+        { message: "Invalid movie_id format" },
+        { status: 400 },
       );
     }
 
@@ -35,7 +44,7 @@ export async function GET(req: NextRequest) {
           message: "No tickets found for this movie",
           reservedSeats: [],
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -72,7 +81,7 @@ export async function GET(req: NextRequest) {
         reservedSeats: seatsWithStatus,
         count: seatsWithStatus.length,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     console.error("Error fetching reserved seats:", e);
@@ -81,7 +90,7 @@ export async function GET(req: NextRequest) {
         message: "Failed to fetch reserved seats",
         error: e instanceof Error ? e.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

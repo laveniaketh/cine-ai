@@ -22,21 +22,35 @@ import { LogOut } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 
 
-const AdminNav = () => {
-    const navItems = [
-        {
-            name: "Movies",
-            link: "movies",
-        },
+type AdminNavProps = {
+    role: string
+}
+
+const AdminNav = ({ role }: AdminNavProps) => {
+    const allNavItems = [
         {
             name: "Dashboard",
             link: "dashboard",
+            roles: ["admin", "cashier"],
+        },
+        {
+            name: "Movies",
+            link: "movies",
+            roles: ["admin"],
         },
         {
             name: "Tickets",
             link: "tickets",
+            roles: ["admin", "cashier"],
+        },
+        {
+            name: "User Management",
+            link: "user-management",
+            roles: ["admin"],
         },
     ];
+
+    const navItems = allNavItems.filter((item) => item.roles.includes(role));
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 

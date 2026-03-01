@@ -4,6 +4,7 @@ import Movie from "@/database/movie.model";
 import Ticket from "@/database/ticket.model";
 import Payment from "@/database/payment.model";
 import ReservedSeat from "@/database/reservedSeat.model";
+import { sanitizeString, escapeRegex } from "@/lib/sanitize";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,15 +12,15 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    const {
-      movieTitle,
-      seatsSelected,
-      paymentAmount,
-      paymentStatus,
-      platform,
-      dayOfWeek,
-      weekNumber,
-    } = body;
+    // Sanitize all string inputs to prevent NoSQL injection
+    const movieTitle = sanitizeString(body.movieTitle);
+    const paymentStatus = sanitizeString(body.paymentStatus);
+    const platform = sanitizeString(body.platform);
+    const dayOfWeek = sanitizeString(body.dayOfWeek);
+    const weekNumber = sanitizeString(body.weekNumber);
+    const paymentAmount =
+      typeof body.paymentAmount === "number" ? body.paymentAmount : null;
+    const seatsSelected = body.seatsSelected;
 
     // Validate required fields
     if (
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { message: "Required fields are missing" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!validPlatforms.includes(platform.toLowerCase())) {
       return NextResponse.json(
         { message: "platform must be kiosk or website" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(seatsSelected) || seatsSelected.length === 0) {
       return NextResponse.json(
         { message: "seatsSelected must be a non-empty array" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -59,26 +60,29 @@ export async function POST(req: NextRequest) {
     if (!validStatuses.includes(paymentStatus.toLowerCase())) {
       return NextResponse.json(
         { message: "paymentStatus must be paid, pending, or cancelled" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Find movie by title
+    // Find movie by title (escape regex to prevent regex injection / ReDoS)
     const movie = await Movie.findOne({
-      movieTitle: { $regex: new RegExp(`^${movieTitle}$`, "i") },
+      movieTitle: { $regex: new RegExp(`^${escapeRegex(movieTitle)}$`, "i") },
     });
 
     if (!movie) {
       return NextResponse.json(
         { message: `Movie "${movieTitle}" not found` },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // Check if any of the selected seats are already reserved for this movie, day, and week
     const existingReservations = await ReservedSeat.find({
       seatNumber: {
-        $in: seatsSelected.map((seat: string) => seat.toUpperCase()),
+        $in: seatsSelected.map((seat: string) => {
+          const s = typeof seat === "string" ? seat : String(seat);
+          return s.toUpperCase();
+        }),
       },
     }).populate({
       path: "ticket_id",
@@ -99,7 +103,7 @@ export async function POST(req: NextRequest) {
           message: "Some seats are already reserved",
           reservedSeats: reservedSeats,
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -129,7 +133,7 @@ export async function POST(req: NextRequest) {
       ReservedSeat.create({
         ticket_id: ticket._id,
         seatNumber: seat.toUpperCase(),
-      })
+      }),
     );
 
     const reservedSeatsRecords = await Promise.all(reservedSeatsPromises);
@@ -153,7 +157,7 @@ export async function POST(req: NextRequest) {
           reservedSeats: reservedSeatsRecords.map((seat) => seat.seatNumber),
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (e) {
     console.error(e);
@@ -162,7 +166,7 @@ export async function POST(req: NextRequest) {
         message: "Ticket purchase failed",
         error: e instanceof Error ? e.message : "Unknown",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -198,7 +202,7 @@ export async function GET() {
             : null,
           reservedSeats: reservedSeats.map((seat) => seat.seatNumber),
         };
-      })
+      }),
     );
 
     // Filter out incomplete tickets (no payment or no reserved seats)
@@ -207,17 +211,17 @@ export async function GET() {
         ticket.ticket_id &&
         ticket.payment &&
         ticket.reservedSeats &&
-        ticket.reservedSeats.length > 0
+        ticket.reservedSeats.length > 0,
     );
 
     return NextResponse.json(
       { message: "Tickets fetched successfully", tickets: validTickets },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (e) {
     return NextResponse.json(
       { message: "Tickets fetch failed", error: e },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -3,21 +3,68 @@ import connectDB from "@/lib/mongodb";
 import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
 import { sanitizeString } from "@/lib/sanitize";
+import { decrypt } from "@/lib/session";
+import { cookies } from "next/headers";
 
+// Helper to verify the requesting user is an admin
+async function verifyAdmin() {
+  const cookie = (await cookies()).get("session")?.value;
+  const session = await decrypt(cookie);
+  if (!session?.userId || session.role !== "admin") {
+    return null;
+  }
+  return session;
+}
+
+// GET - List all users
+export async function GET() {
+  try {
+    const session = await verifyAdmin();
+    if (!session) {
+      return NextResponse.json(
+        { message: "Unauthorized. Admin access required." },
+        { status: 403 },
+      );
+    }
+
+    await connectDB();
+
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
+
+    return NextResponse.json(
+      { message: "Users fetched successfully", users },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return NextResponse.json(
+      { message: "Failed to fetch users" },
+      { status: 500 },
+    );
+  }
+}
+
+// POST - Create a new user
 export async function POST(req: NextRequest) {
   try {
+    const session = await verifyAdmin();
+    if (!session) {
+      return NextResponse.json(
+        { message: "Unauthorized. Admin access required." },
+        { status: 403 },
+      );
+    }
+
     await connectDB();
 
     const body = await req.json();
 
-    // Sanitize inputs — reject objects/arrays to prevent NoSQL injection
     const fullName = sanitizeString(body.fullName);
     const email = sanitizeString(body.email);
     const username = sanitizeString(body.username);
     const password = sanitizeString(body.password);
     const role = sanitizeString(body.role);
 
-    // Validate required fields
     if (!fullName || !email || !username || !password || !role) {
       return NextResponse.json(
         { message: "All fields are required" },
@@ -34,7 +81,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if user already exists (safe: values are guaranteed strings)
+    // Check if user already exists
     const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username }],
     });
@@ -48,48 +95,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create new user
     const newUser = await User.create({
       fullName,
-      email,
+      email: email.toLowerCase(),
       username,
       password: hashedPassword,
       role,
     });
 
-    // Return success without password
     return NextResponse.json(
       {
-        message: "User account created successfully",
+        message: "User created successfully",
         user: {
           id: newUser._id,
           fullName: newUser.fullName,
           email: newUser.email,
           username: newUser.username,
           role: newUser.role,
+          createdAt: newUser.createdAt,
         },
       },
       { status: 201 },
     );
-  } catch (error: any) {
-    console.error("Registration error:", error);
+  } catch (error: unknown) {
+    console.error("Error creating user:", error);
 
-    // Handle Mongoose validation errors
-    if (error.name === "ValidationError") {
-      const messages = Object.values(error.errors).map(
-        (err: any) => err.message,
-      );
-      return NextResponse.json(
-        { message: messages.join(", ") },
-        { status: 400 },
-      );
+    if (error instanceof Error && error.name === "ValidationError") {
+      return NextResponse.json({ message: error.message }, { status: 400 });
     }
 
     return NextResponse.json(
-      { message: "Failed to create user account" },
+      { message: "Failed to create user" },
       { status: 500 },
     );
   }

@@ -3,14 +3,22 @@ import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
 // 1. Specify protected and public routes
-const protectedRoutes = ["/dashboard", "/movies", "/tickets"];
-const publicRoutes = ["/login/admin", "/"];
+const protectedRoutes = [
+  "/dashboard",
+  "/movies",
+  "/tickets",
+  "/user-management",
+];
+const publicRoutes = ["/"];
+
+// Routes restricted to admin role only
+const adminOnlyRoutes = ["/movies", "/user-management"];
 
 export default async function middleware(req: NextRequest) {
   // 2. Check if the current route is protected or public
   const path = req.nextUrl.pathname;
   const isProtectedRoute = protectedRoutes.some((route) =>
-    path.startsWith(route)
+    path.startsWith(route),
   );
   const isPublicRoute = publicRoutes.includes(path);
 
@@ -19,14 +27,22 @@ export default async function middleware(req: NextRequest) {
   const session = await decrypt(cookie);
 
   // 4. Redirect to /login/admin if the user is not authenticated
-  if (isProtectedRoute && !session?.adminId) {
+  if (isProtectedRoute && !session?.userId) {
     return NextResponse.redirect(new URL("/", req.nextUrl));
   }
 
-  // 5. Redirect to /dashboard if the user is authenticated
+  // 5. Role-based access control: block cashiers from admin-only routes
+  if (isProtectedRoute && session?.userId) {
+    const isAdminOnly = adminOnlyRoutes.some((route) => path.startsWith(route));
+    if (isAdminOnly && session.role !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+    }
+  }
+
+  // 6. Redirect to /dashboard if the user is authenticated
   if (
     isPublicRoute &&
-    session?.adminId &&
+    session?.userId &&
     !req.nextUrl.pathname.startsWith("/dashboard")
   ) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
