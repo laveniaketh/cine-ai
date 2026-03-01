@@ -362,6 +362,15 @@
   }
 }
 
+@keyframes voiceBar {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 /*@import "tailwindcss";*/
 /*@import "tw-animate-css";*/
 

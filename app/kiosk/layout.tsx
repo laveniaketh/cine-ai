@@ -11,7 +11,7 @@ const KioskLayout = ({ children }: { children: React.ReactNode }) => {
             {/* Voice Navigation Assistant */}
             {/* <VoiceNavigation /> */}
             {/* Voice Chatbot Assistant */}
-            {/* <VoiceChatbot /> */}
+            <VoiceChatbot />
             <VoiceAssistant />
             {children}
 
