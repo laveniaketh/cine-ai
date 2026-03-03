@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
       seatsSelected,
       paymentAmount,
       paymentStatus,
+      paymentMethod,
       platform,
       dayOfWeek,
       weekNumber,
@@ -59,6 +60,19 @@ export async function POST(req: NextRequest) {
     if (!validStatuses.includes(paymentStatus.toLowerCase())) {
       return NextResponse.json(
         { message: "paymentStatus must be paid, pending, or cancelled" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedPaymentMethod =
+      typeof paymentMethod === "string"
+        ? paymentMethod.toLowerCase()
+        : "counter";
+
+    const validPaymentMethods = ["counter", "paymongo"];
+    if (!validPaymentMethods.includes(normalizedPaymentMethod)) {
+      return NextResponse.json(
+        { message: "paymentMethod must be counter or paymongo" },
         { status: 400 }
       );
     }
@@ -122,6 +136,8 @@ export async function POST(req: NextRequest) {
       movie_id: movie._id,
       paymentAmount: paymentAmount,
       paymentStatus: paymentStatus.toLowerCase(),
+      paymentMethod: normalizedPaymentMethod,
+      gateway: normalizedPaymentMethod === "paymongo" ? "paymongo" : null,
     });
 
     // Create reserved seats
@@ -149,6 +165,8 @@ export async function POST(req: NextRequest) {
           payment: {
             paymentAmount: payment.paymentAmount,
             paymentStatus: payment.paymentStatus,
+            paymentMethod: payment.paymentMethod,
+            gateway: payment.gateway,
           },
           reservedSeats: reservedSeatsRecords.map((seat) => seat.seatNumber),
         },
@@ -194,6 +212,8 @@ export async function GET() {
             ? {
                 paymentAmount: payment.paymentAmount,
                 paymentStatus: payment.paymentStatus,
+                paymentMethod: payment.paymentMethod,
+                gateway: payment.gateway,
               }
             : null,
           reservedSeats: reservedSeats.map((seat) => seat.seatNumber),

@@ -5,10 +5,20 @@ import { cookies } from "next/headers";
 // 1. Specify protected and public routes
 const protectedRoutes = ["/dashboard", "/movies", "/tickets"];
 const publicRoutes = ["/login/admin", "/"];
+const kioskOnlyRedirectRoutes = ["/login/admin", "/dashboard", "/movies", "/tickets"];
 
 export default async function middleware(req: NextRequest) {
   // 2. Check if the current route is protected or public
   const path = req.nextUrl.pathname;
+
+  if (path === "/") {
+    return NextResponse.redirect(new URL("/kiosk", req.nextUrl));
+  }
+
+  if (kioskOnlyRedirectRoutes.some((route) => path.startsWith(route))) {
+    return NextResponse.redirect(new URL("/kiosk", req.nextUrl));
+  }
+
   const isProtectedRoute = protectedRoutes.some((route) =>
     path.startsWith(route)
   );

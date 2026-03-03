@@ -6,6 +6,9 @@ export interface IPayment extends Document {
   movie_id: Types.ObjectId;
   paymentAmount: number;
   paymentStatus: string;
+  paymentMethod: string;
+  gateway?: string;
+  gatewayReference?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +41,28 @@ const PaymentSchema = new Schema<IPayment>(
       },
       default: "pending",
     },
+    paymentMethod: {
+      type: String,
+      required: [true, "Payment method is required"],
+      trim: true,
+      lowercase: true,
+      enum: {
+        values: ["counter", "paymongo"],
+        message: "Payment method must be counter or paymongo",
+      },
+      default: "counter",
+    },
+    gateway: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+    gatewayReference: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   {
     timestamps: true, // Auto-generate createdAt and updatedAt
@@ -55,6 +80,9 @@ PaymentSchema.index({ ticket_id: 1, paymentStatus: 1 });
 
 // Create index on paymentStatus for filtering
 PaymentSchema.index({ paymentStatus: 1 });
+
+// Create index on gateway reference for callback lookup
+PaymentSchema.index({ gatewayReference: 1 });
 
 const Payment = models.Payment || model<IPayment>("Payment", PaymentSchema);
 

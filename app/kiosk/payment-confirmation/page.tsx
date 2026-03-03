@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -19,11 +19,13 @@ interface MovieDetails {
 
 const PaymentConfirmation = () => {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const selectedMovie = useMovieSelectionStore((state) => state.selectedMovie);
     const selectedSeats = useMovieSelectionStore((state) => state.selectedSeats);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<"counter" | "paymongo">("counter");
 
     const handleConfirmPurchase = async () => {
         setIsLoading(true);
@@ -51,12 +53,32 @@ const PaymentConfirmation = () => {
                 seatsSelected: selectedSeats,
                 paymentAmount: paymentAmount,
                 paymentStatus: 'pending',
+                paymentMethod,
                 platform: 'kiosk',
                 dayOfWeek: currentDayOfWeek,
                 weekNumber: currentWeekNumber,
             };
 
-            // Send POST request
+            if (paymentMethod === "paymongo") {
+                const response = await fetch('/api/payments/paymongo/checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.checkoutUrl) {
+                    throw new Error(data.message || 'Failed to initialize PayMongo checkout.');
+                }
+
+                setIsDialogOpen(false);
+                window.location.href = data.checkoutUrl;
+                return;
+            }
+
             const response = await fetch('/api/tickets', {
                 method: 'POST',
                 headers: {
@@ -67,10 +89,10 @@ const PaymentConfirmation = () => {
 
             const data = await response.json();
 
-            // Handle error responses
             if (!response.ok) {
                 throw new Error(data.message || 'Failed to process your purchase. Please try again.');
             }
+
             setIsDialogOpen(false);
             router.push('/kiosk/payment-sucessful');
         } catch (err) {
@@ -112,6 +134,7 @@ const PaymentConfirmation = () => {
 
     const seatPrice = 200;
     const total = selectedSeats.length * seatPrice;
+    const paymentResult = searchParams.get("payment");
 
     // Helper function to format 24-hour time to 12-hour format
     const formatTo12Hour = (time: string): string => {
@@ -182,6 +205,24 @@ const PaymentConfirmation = () => {
 
                         <div className="flex flex-col gap-6">
                             <h2 className="text-4xl font-bold">Payment</h2>
+                            <div className="flex gap-3">
+                                <Button
+                                    type="button"
+                                    variant={paymentMethod === "counter" ? "default" : "outline"}
+                                    className="text-base"
+                                    onClick={() => setPaymentMethod("counter")}
+                                >
+                                    Pay at Counter
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={paymentMethod === "paymongo" ? "default" : "outline"}
+                                    className="text-base"
+                                    onClick={() => setPaymentMethod("paymongo")}
+                                >
+                                    PayMongo
+                                </Button>
+                            </div>
                             <div className="flex flex-row justify-between">
                                 <p className="text-2xl">{selectedSeats.join(", ")}</p>
                                 <p className="text-2xl">x {selectedSeats.length}</p>
@@ -236,6 +277,20 @@ const PaymentConfirmation = () => {
                 </div>
             )}
 
+            {paymentResult === "failed" && !error && (
+                <div className="fixed top-4 right-4 bg-red-500/90 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md">
+                    <p className="font-semibold text-lg mb-1">Payment Failed</p>
+                    <p className="text-sm">Your PayMongo payment was not completed. Please try again.</p>
+                </div>
+            )}
+
+            {paymentResult === "cancelled" && !error && (
+                <div className="fixed top-4 right-4 bg-yellow-500/90 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md">
+                    <p className="font-semibold text-lg mb-1">Payment Cancelled</p>
+                    <p className="text-sm">You cancelled the PayMongo checkout.</p>
+                </div>
+            )}
+
             {/* Confirmation Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="sm:max-w-[425px]">
@@ -266,7 +321,7 @@ const PaymentConfirmation = () => {
                                     Processing...
                                 </>
                             ) : (
-                                'Confirm'
+                                paymentMethod === "paymongo" ? 'Continue to PayMongo' : 'Confirm'
                             )}
                         </Button>
                     </DialogFooter>
