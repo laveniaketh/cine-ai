@@ -74,7 +74,7 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
                     Add User
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-neutral-900 border-neutral-700">
+            <DialogContent className="max-w-[50vw] overflow-y-auto bg-neutral-900 border-neutral-700">
                 <DialogHeader>
                     <DialogTitle className="text-white">Add New User</DialogTitle>
                     <DialogDescription className="text-gray-400">

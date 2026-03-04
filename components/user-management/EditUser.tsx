@@ -102,7 +102,7 @@ const EditUser = ({ user, open, onOpenChange, onSuccess, onError }: EditUserProp
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-neutral-900 border-neutral-700">
+            <DialogContent className="max-w-[50vw] overflow-y-auto bg-neutral-900 border-neutral-700">
                 <DialogHeader>
                     <DialogTitle className="text-white">Edit User</DialogTitle>
                     <DialogDescription className="text-gray-400">
