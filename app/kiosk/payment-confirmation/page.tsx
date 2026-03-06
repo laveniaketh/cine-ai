@@ -71,7 +71,7 @@ const PaymentConfirmation = () => {
                 const data = await response.json();
 
                 if (!response.ok || !data.checkoutUrl) {
-                    throw new Error(data.message || 'Failed to initialize PayMongo checkout.');
+                    throw new Error(data.message || 'Failed to initialize e-wallet/online payment checkout.');
                 }
 
                 setIsDialogOpen(false);
@@ -220,7 +220,7 @@ const PaymentConfirmation = () => {
                                     className="text-base"
                                     onClick={() => setPaymentMethod("paymongo")}
                                 >
-                                    PayMongo
+                                    E-wallet/Online Payment
                                 </Button>
                             </div>
                             <div className="flex flex-row justify-between">
@@ -280,14 +280,14 @@ const PaymentConfirmation = () => {
             {paymentResult === "failed" && !error && (
                 <div className="fixed top-4 right-4 bg-red-500/90 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md">
                     <p className="font-semibold text-lg mb-1">Payment Failed</p>
-                    <p className="text-sm">Your PayMongo payment was not completed. Please try again.</p>
+                    <p className="text-sm">Your e-wallet/online payment was not completed. Please try again.</p>
                 </div>
             )}
 
             {paymentResult === "cancelled" && !error && (
                 <div className="fixed top-4 right-4 bg-yellow-500/90 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md">
                     <p className="font-semibold text-lg mb-1">Payment Cancelled</p>
-                    <p className="text-sm">You cancelled the PayMongo checkout.</p>
+                    <p className="text-sm">You cancelled the e-wallet/online payment checkout.</p>
                 </div>
             )}
 
@@ -321,7 +321,7 @@ const PaymentConfirmation = () => {
                                     Processing...
                                 </>
                             ) : (
-                                paymentMethod === "paymongo" ? 'Continue to PayMongo' : 'Confirm'
+                                paymentMethod === "paymongo" ? 'Continue to Online Payment' : 'Confirm'
                             )}
                         </Button>
                     </DialogFooter>

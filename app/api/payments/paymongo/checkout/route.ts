@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         {
-          message: "PayMongo checkout session created",
+          message: "E-wallet/online payment checkout session created",
           checkoutUrl: checkoutSession.data.attributes.checkout_url,
           checkoutSessionId: checkoutSession.data.id,
           ticketId: ticket.ticket_id,
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       {
-        message: "Failed to initialize PayMongo checkout",
+        message: "Failed to initialize e-wallet/online payment checkout",
         error: error instanceof Error ? error.message : "Unknown",
       },
       { status: 500 }

@@ -48,7 +48,7 @@ const PaymentSchema = new Schema<IPayment>(
       lowercase: true,
       enum: {
         values: ["counter", "paymongo"],
-        message: "Payment method must be counter or paymongo",
+        message: "Payment method must be counter or e-wallet/online payment",
       },
       default: "counter",
     },

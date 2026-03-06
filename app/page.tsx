@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation"
-
 const Page = () => {
-    redirect("/kiosk")
+    return null
 }
 
 export default Page

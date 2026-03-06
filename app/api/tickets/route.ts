@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const validPaymentMethods = ["counter", "paymongo"];
     if (!validPaymentMethods.includes(normalizedPaymentMethod)) {
       return NextResponse.json(
-        { message: "paymentMethod must be counter or paymongo" },
+        { message: "paymentMethod must be counter or e-wallet/online payment" },
         { status: 400 }
       );
     }
