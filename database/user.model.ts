@@ -10,6 +10,9 @@ export interface IUser extends Document {
   username: string;
   password: string;
   role: UserRole;
+  phoneNumber?: string;
+  twoFactorCode?: string;
+  twoFactorExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,6 +58,19 @@ const UserSchema = new Schema<IUser>(
       enum: ["admin", "cashier"],
       default: "admin",
       required: true,
+    },
+    phoneNumber: {
+      type: String,
+      required: [true, "Phone number is required for 2FA"],
+      trim: true,
+      match: [/^09\d{9}$/, "Please provide a valid Philippine mobile number (e.g. 09813693920)"],
+    },
+    // store temporary verification data for 2FA
+    twoFactorCode: {
+      type: String,
+    },
+    twoFactorExpires: {
+      type: Date,
     },
   },
   {

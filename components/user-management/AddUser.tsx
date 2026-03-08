@@ -37,6 +37,7 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
         username: "",
         password: "",
         role: "cashier" as string,
+        phoneNumber: "",
     })
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -44,6 +45,14 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
         setLoading(true)
 
         try {
+            // simple phone format check before sending
+            const phoneRegex = /^09\d{9}$/
+            if (!phoneRegex.test(form.phoneNumber)) {
+                onError("Phone number must be a valid Philippine mobile number")
+                setLoading(false)
+                return
+            }
+
             const response = await fetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -54,7 +63,7 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
 
             if (response.ok) {
                 setOpen(false)
-                setForm({ fullName: "", email: "", username: "", password: "", role: "cashier" })
+                setForm({ fullName: "", email: "", username: "", password: "", role: "cashier", phoneNumber: "" })
                 onSuccess()
             } else {
                 onError(data.message)
@@ -74,15 +83,15 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
                     Add User
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-neutral-900 border-neutral-700">
+            <DialogContent className="w-full max-w-lg mx-auto bg-neutral-900 border-neutral-700 p-5 sm:p-6">
                 <DialogHeader>
                     <DialogTitle className="text-white">Add New User</DialogTitle>
                     <DialogDescription className="text-gray-400">
-                        Create a new user account and assign their role.
+                        Create a user account and assign a role.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit}>
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-3 py-1">
                         <div className="space-y-2">
                             <Label className="text-white">Full Name</Label>
                             <Input
@@ -113,6 +122,21 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
                                 required
                                 className="bg-neutral-800 border-neutral-700 text-white"
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-white">Phone Number</Label>
+                            <Input
+                                type="tel"
+                                value={form.phoneNumber}
+                                onChange={(e) => setForm(f => ({ ...f, phoneNumber: e.target.value }))}
+                                placeholder="09XXXXXXXXX"
+                                required
+                                pattern="^09\d{9}$"
+                                className="bg-neutral-800 border-neutral-700 text-white"
+                            />
+                            <p className="text-xs text-gray-500">
+                                Philippine mobile format (start with 09 followed by 9 digits).
+                            </p>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-white">Password</Label>
@@ -147,7 +171,7 @@ const AddUser = ({ onSuccess, onError }: AddUserProps) => {
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500">
                                 {form.role === "admin"
                                     ? "Access: Dashboard, Movies, Tickets, User Management"
                                     : "Access: Dashboard, Tickets"}

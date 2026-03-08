@@ -4,8 +4,18 @@ import { z } from "zod";
 import connectDB from "@/lib/mongodb";
 import User from "@/database/user.model";
 import bcrypt from "bcryptjs";
-import { createSession, deleteSession } from "@/lib/session";
+import {
+  clearPendingTwoFactorSession,
+  createPendingTwoFactorSession,
+  createSession,
+  deleteSession,
+  getPendingTwoFactorSession,
+  isTrustedTwoFactorDevice,
+  setTrustedTwoFactorDevice,
+  setPendingTwoFactorMethod,
+} from "@/lib/session";
 import { redirect } from "next/navigation";
+import { generateTwoFactorCode, sendVerificationCode } from "@/lib/twoFactor";
 
 // Validation schemas
 const SignupFormSchema = z.object({
@@ -28,12 +38,29 @@ const SignupFormSchema = z.object({
     .trim(),
 });
 
-const LoginFormSchema = z.object({
-  username: z
-    .string()
-    .min(1, { message: "Username or email is required." })
-    .trim(),
-  password: z.string().min(1, { message: "Password is required." }).trim(),
+const LoginFormSchema = z
+  .object({
+    username: z
+      .string()
+      .min(1, { message: "Username or email is required." })
+      .trim(),
+    password: z.string().min(1, { message: "Password is required." }).trim(),
+  });
+
+const TwoFactorMethodSchema = z.object({
+  method: z.enum(["sms", "call"], {
+    message: "Please select a verification method.",
+  }),
+});
+
+const TwoFactorCodeSchema = z.object({
+  code: z.preprocess(
+    (value) => String(value ?? "").replace(/\D/g, ""),
+    z
+      .string()
+      .length(6, { message: "Code must be 6 digits." })
+      .regex(/^\d{6}$/, { message: "Code must be 6 digits." }),
+  ),
 });
 
 export type FormState =
@@ -43,6 +70,8 @@ export type FormState =
         email?: string[];
         username?: string[];
         password?: string[];
+        method?: string[];
+        code?: string[];
       };
       message?: string;
     }
@@ -122,75 +151,213 @@ export async function signup(state: FormState, formData: FormData) {
 }
 
 export async function login(state: FormState, formData: FormData) {
-  console.log("=== LOGIN ATTEMPT ===");
-
-  // 1. Validate form fields
   const validatedFields = LoginFormSchema.safeParse({
     username: formData.get("username"),
     password: formData.get("password"),
   });
 
-  // If any form fields are invalid, return early
   if (!validatedFields.success) {
-    console.log(
-      "Validation failed:",
-      validatedFields.error.flatten().fieldErrors,
-    );
     return {
       errors: validatedFields.error.flatten().fieldErrors,
     };
   }
 
   const { username, password } = validatedFields.data;
-  console.log("Login attempt for username:", username);
+  let nextPath: "/dashboard" | "/verify-2fa" = "/dashboard";
 
   try {
     await connectDB();
-    console.log("Database connected");
 
-    // 2. Find user by username or email
     const user = await User.findOne({
       $or: [{ username }, { email: username.toLowerCase() }],
     });
 
-    console.log("User found:", user ? "Yes" : "No");
-
     if (!user) {
-      return {
-        message: "Invalid credentials",
-      };
+      return { message: "Invalid credentials" };
     }
 
-    // 3. Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log("Password valid:", isPasswordValid);
 
     if (!isPasswordValid) {
-      return {
-        message: "Invalid credentials",
-      };
+      return { message: "Invalid credentials" };
     }
 
-    // 4. Create session
-    console.log("Creating session for user:", user.username);
+    if (user.phoneNumber) {
+      const trustedDevice = await isTrustedTwoFactorDevice(user._id.toString());
+
+      if (trustedDevice) {
+        await createSession(
+          user._id.toString(),
+          user.username,
+          user.email,
+          user.role || "admin",
+        );
+      } else {
+        await createPendingTwoFactorSession({
+          userId: user._id.toString(),
+          username: user.username,
+          email: user.email,
+          role: user.role || "admin",
+          phoneNumber: user.phoneNumber,
+        });
+        nextPath = "/verify-2fa";
+      }
+    } else {
+      await createSession(
+        user._id.toString(),
+        user.username,
+        user.email,
+        user.role || "admin",
+      );
+    }
+  } catch (error: any) {
+    return {
+      message: "Login failed: " + error.message,
+    };
+  }
+
+  redirect(nextPath);
+}
+
+export async function sendTwoFactorCode(state: FormState, formData: FormData) {
+  const validatedFields = TwoFactorMethodSchema.safeParse({
+    method: formData.get("method"),
+  });
+
+  if (!validatedFields.success) {
+    return { errors: validatedFields.error.flatten().fieldErrors };
+  }
+
+  const pending = await getPendingTwoFactorSession();
+  if (!pending) {
+    return { message: "Login session expired. Please login again." };
+  }
+
+  try {
+    await connectDB();
+
+    const user = await User.findById(pending.userId);
+    if (!user || !user.phoneNumber) {
+      return { message: "Unable to send code. User phone number not found." };
+    }
+
+    const code = generateTwoFactorCode();
+    user.twoFactorCode = code;
+    user.twoFactorExpires = new Date(Date.now() + 5 * 60 * 1000);
+    await user.save();
+
+    await sendVerificationCode(
+      user.phoneNumber,
+      code,
+      validatedFields.data.method,
+    );
+    await setPendingTwoFactorMethod(validatedFields.data.method);
+  } catch (error: any) {
+    return {
+      message:
+        error?.message ||
+        "Failed to send verification code. Please try again.",
+    };
+  }
+
+  redirect("/verify-2fa/code");
+}
+
+export async function verifyTwoFactorCode(state: FormState, formData: FormData) {
+  const validatedFields = TwoFactorCodeSchema.safeParse({
+    code: formData.get("code"),
+  });
+
+  if (!validatedFields.success) {
+    return { errors: validatedFields.error.flatten().fieldErrors };
+  }
+
+  const pending = await getPendingTwoFactorSession();
+  if (!pending) {
+    return { message: "Login session expired. Please login again." };
+  }
+
+  try {
+    await connectDB();
+
+    const trustDevice =
+      formData.get("trustDevice") === "on" ||
+      formData.get("trustDevice") === "true";
+
+    const user = await User.findById(pending.userId);
+    if (!user) {
+      return { message: "User not found. Please login again." };
+    }
+
+    if (
+      !user.twoFactorCode ||
+      !user.twoFactorExpires ||
+      user.twoFactorExpires.getTime() < Date.now()
+    ) {
+      return { message: "Verification code expired. Please request a new code." };
+    }
+
+    if (validatedFields.data.code !== user.twoFactorCode) {
+      return { message: "Invalid verification code." };
+    }
+
+    user.twoFactorCode = undefined;
+    user.twoFactorExpires = undefined;
+    await user.save();
+
     await createSession(
       user._id.toString(),
       user.username,
       user.email,
       user.role || "admin",
     );
-    console.log("Session created successfully");
+
+    if (trustDevice) {
+      await setTrustedTwoFactorDevice(user._id.toString());
+    }
+
+    await clearPendingTwoFactorSession();
   } catch (error: any) {
-    console.error("Login error details:", error);
-    console.error("Error stack:", error.stack);
-    return {
-      message: "Login failed: " + error.message,
-    };
+    return { message: error?.message || "Verification failed. Please try again." };
   }
 
-  // 5. Redirect user
-  console.log("Redirecting to dashboard");
   redirect("/dashboard");
+}
+
+export async function cancelTwoFactorLogin() {
+  await clearPendingTwoFactorSession();
+  redirect("/");
+}
+
+export async function resendTwoFactorCode() {
+  const pending = await getPendingTwoFactorSession();
+  if (!pending) {
+    return { message: "Login session expired. Please login again." };
+  }
+
+  try {
+    await connectDB();
+
+    const user = await User.findById(pending.userId);
+    if (!user || !user.phoneNumber) {
+      return { message: "Unable to send code. User phone number not found." };
+    }
+
+    const code = generateTwoFactorCode();
+    user.twoFactorCode = code;
+    user.twoFactorExpires = new Date(Date.now() + 5 * 60 * 1000);
+    await user.save();
+
+    await sendVerificationCode(user.phoneNumber, code, pending.method || "sms");
+
+    return { message: "A new verification code has been sent." };
+  } catch (error: any) {
+    return {
+      message:
+        error?.message ||
+        "Failed to send verification code. Please try again.",
+    };
+  }
 }
 
 export async function logout() {

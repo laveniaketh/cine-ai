@@ -64,12 +64,24 @@ export async function POST(req: NextRequest) {
     const username = sanitizeString(body.username);
     const password = sanitizeString(body.password);
     const role = sanitizeString(body.role);
+    const phoneNumber = sanitizeString(body.phoneNumber);
 
     if (!fullName || !email || !username || !password || !role) {
       return NextResponse.json(
         { message: "All fields are required" },
         { status: 400 },
       );
+    }
+
+    // Phone number is required for 2FA
+    if (!phoneNumber) {
+      return NextResponse.json({ message: "Phone number is required" }, { status: 400 });
+    }
+
+    // validate Philippine mobile format
+    const phoneRegex = /^09\d{9}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      return NextResponse.json({ message: "Invalid phone number format" }, { status: 400 });
     }
 
     // Validate role
@@ -103,6 +115,7 @@ export async function POST(req: NextRequest) {
       username,
       password: hashedPassword,
       role,
+      phoneNumber,
     });
 
     return NextResponse.json(
@@ -113,6 +126,7 @@ export async function POST(req: NextRequest) {
           fullName: newUser.fullName,
           email: newUser.email,
           username: newUser.username,
+          phoneNumber: newUser.phoneNumber,
           role: newUser.role,
           createdAt: newUser.createdAt,
         },

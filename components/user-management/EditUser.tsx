@@ -28,6 +28,7 @@ type User = {
     email: string
     username: string
     role: "admin" | "cashier"
+    phoneNumber?: string
     createdAt: string
 }
 
@@ -47,6 +48,7 @@ const EditUser = ({ user, open, onOpenChange, onSuccess, onError }: EditUserProp
         username: "",
         password: "",
         role: "cashier" as string,
+        phoneNumber: "",
     })
 
     useEffect(() => {
@@ -57,6 +59,7 @@ const EditUser = ({ user, open, onOpenChange, onSuccess, onError }: EditUserProp
                 username: user.username,
                 password: "",
                 role: user.role,
+                phoneNumber: (user as any).phoneNumber || "",
             })
         }
     }, [user])
@@ -71,12 +74,23 @@ const EditUser = ({ user, open, onOpenChange, onSuccess, onError }: EditUserProp
             if (form.fullName !== user.fullName) payload.fullName = form.fullName
             if (form.email !== user.email) payload.email = form.email
             if (form.username !== user.username) payload.username = form.username
+            if (form.phoneNumber !== (user as any).phoneNumber) payload.phoneNumber = form.phoneNumber
             if (form.role !== user.role) payload.role = form.role
             if (form.password) payload.password = form.password
 
             if (Object.keys(payload).length === 0) {
                 onOpenChange(false)
                 return
+            }
+
+            // validate phone number before submitting
+            if (payload.phoneNumber) {
+                const phoneRegex = /^09\d{9}$/
+                if (!phoneRegex.test(payload.phoneNumber)) {
+                    onError("Phone number must be a valid Philippine mobile number")
+                    setLoading(false)
+                    return
+                }
             }
 
             const response = await fetch(`/api/admin/users/${user._id}`, {
@@ -138,6 +152,21 @@ const EditUser = ({ user, open, onOpenChange, onSuccess, onError }: EditUserProp
                                 required
                                 className="bg-neutral-800 border-neutral-700 text-white"
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-white">Phone Number</Label>
+                            <Input
+                                type="tel"
+                                value={form.phoneNumber}
+                                onChange={(e) => setForm(f => ({ ...f, phoneNumber: e.target.value }))}
+                                placeholder="09XXXXXXXXX"
+                                required
+                                pattern="^09\d{9}$"
+                                className="bg-neutral-800 border-neutral-700 text-white"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Philippine mobile format (start with 09 followed by 9 digits).
+                            </p>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-white">New Password (leave blank to keep current)</Label>

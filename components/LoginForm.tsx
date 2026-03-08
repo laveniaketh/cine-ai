@@ -19,7 +19,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { useActionState } from "react"
 import { login } from "@/app/actions/auth"
-import Link from "next/link"
 
 const LoginForm = () => {
     const [state, action, pending] = useActionState(login, undefined)
@@ -40,33 +39,33 @@ const LoginForm = () => {
                         <FieldSet>
                             <FieldGroup >
                                 <Field>
-                                    <FieldLabel htmlFor="username">Username</FieldLabel>
-                                    <Input
-                                        id="username"
-                                        name="username"
-                                        type="text"
-                                        placeholder="Write your username"
-                                        required
-                                        disabled={pending}
-                                    />
+                                        <FieldLabel htmlFor="username">Username</FieldLabel>
+                                        <Input
+                                            id="username"
+                                            name="username"
+                                            type="text"
+                                            placeholder="Write your username"
+                                            required
+                                            disabled={pending}
+                                        />
                                     {state?.errors?.username && (
                                         <p className="text-sm text-red-500 mt-1">{state.errors.username}</p>
                                     )}
                                 </Field>
-                                <Field>
-                                    <FieldLabel htmlFor="password">Password</FieldLabel>
-                                    <Input
-                                        id="password"
-                                        name="password"
-                                        type="password"
-                                        placeholder="••••••••"
-                                        required
-                                        disabled={pending}
-                                    />
-                                    {state?.errors?.password && (
-                                        <p className="text-sm text-red-500 mt-1">{state.errors.password}</p>
-                                    )}
-                                </Field>
+                                    <Field>
+                                        <FieldLabel htmlFor="password">Password</FieldLabel>
+                                        <Input
+                                            id="password"
+                                            name="password"
+                                            type="password"
+                                            placeholder="••••••••"
+                                            required
+                                            disabled={pending}
+                                        />
+                                        {state?.errors?.password && (
+                                            <p className="text-sm text-red-500 mt-1">{state.errors.password}</p>
+                                        )}
+                                    </Field>
                                 {state?.message && (
                                     <p className="text-sm text-red-500 mt-2">{state.message}</p>
                                 )}

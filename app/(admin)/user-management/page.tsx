@@ -44,6 +44,7 @@ type User = {
     email: string
     username: string
     role: "admin" | "cashier"
+        phoneNumber?: string
     createdAt: string
 }
 
@@ -160,7 +161,8 @@ const UserManagement = () => {
         const matchesSearch =
             user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.username.toLowerCase().includes(searchTerm.toLowerCase())
+            user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (user.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
         const matchesRole = roleFilter === "all" || user.role === roleFilter
         return matchesSearch && matchesRole
     })
@@ -289,6 +291,7 @@ const UserManagement = () => {
                             <TableHead className="text-white font-semibold">Full Name</TableHead>
                             <TableHead className="text-white font-semibold">Username</TableHead>
                             <TableHead className="text-white font-semibold">Email</TableHead>
+                            <TableHead className="text-white font-semibold">Phone</TableHead>
                             <TableHead className="text-white font-semibold">Role</TableHead>
                             <TableHead className="text-white font-semibold">Permissions</TableHead>
                             <TableHead className="text-white font-semibold">Created</TableHead>
@@ -314,6 +317,7 @@ const UserManagement = () => {
                                         <TableCell className="text-white font-medium">{user.fullName}</TableCell>
                                         <TableCell className="text-gray-300 font-mono text-sm">{user.username}</TableCell>
                                         <TableCell className="text-gray-300">{user.email}</TableCell>
+                                        <TableCell className="text-gray-300">{user.phoneNumber || "-"}</TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className={roleConfig.badgeClass}>
                                                 <RoleIcon className="h-3 w-3" />
@@ -412,7 +416,7 @@ const UserManagement = () => {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <DialogContent className="bg-neutral-900 border-neutral-700">
+                <DialogContent className="w-full max-w-md mx-auto bg-neutral-900 border-neutral-700 p-5 sm:p-6">
                     <DialogHeader>
                         <DialogTitle className="text-white">Delete User</DialogTitle>
                         <DialogDescription className="text-gray-400">

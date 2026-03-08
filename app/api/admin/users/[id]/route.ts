@@ -91,6 +91,7 @@ export async function PUT(
     const username = sanitizeString(body.username);
     const role = sanitizeString(body.role);
     const password = sanitizeString(body.password);
+    const phoneNumber = sanitizeString(body.phoneNumber);
 
     const updateData: Record<string, string> = {};
 
@@ -122,6 +123,15 @@ export async function PUT(
         { message: "No fields to update" },
         { status: 400 },
       );
+    }
+
+    // validate phone number if provided
+    if (phoneNumber) {
+      const phoneRegex = /^09\d{9}$/;
+      if (!phoneRegex.test(phoneNumber)) {
+        return NextResponse.json({ message: "Invalid phone number format" }, { status: 400 });
+      }
+      updateData.phoneNumber = phoneNumber;
     }
 
     // Check for duplicate email/username (excluding current user)
