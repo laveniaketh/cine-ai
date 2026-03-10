@@ -47,7 +47,7 @@ type TicketData = {
     total: number
     status: "paid" | "pending" | "cancelled" | "refunded"
     platform: "website" | "kiosk"
-    paymentMethod: "online" | "cash"
+    paymentMethod: "e-wallet" | "cash"
     createdAt: Date
 }
 
@@ -104,7 +104,7 @@ const Tickets = () => {
                         total: ticket.payment?.paymentAmount || 0,
                         status: ticket.payment?.paymentStatus || "pending",
                         platform: ticket.platform || "website",
-                        paymentMethod: ticket.platform === "kiosk" ? "cash" : "online",
+                        paymentMethod: ticket.payment?.paymentMethod || (ticket.platform === "kiosk" ? "cash" : "e-wallet"),
                         createdAt: createdDate
                     }
                 })
@@ -586,8 +586,8 @@ const Tickets = () => {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-gray-300">
-                                            <Badge variant={ticket.paymentMethod === "online" ? "default" : "secondary"}>
-                                                {ticket.paymentMethod === "online" ? "Online" : "Cash"}
+                                            <Badge variant={ticket.paymentMethod === "e-wallet" ? "default" : "secondary"}>
+                                                {ticket.paymentMethod === "e-wallet" ? "E-Wallet" : "Cash"}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-gray-300">
@@ -606,7 +606,7 @@ const Tickets = () => {
                                             ₱{ticket.total.toLocaleString()}
                                         </TableCell>
                                         <TableCell>
-                                            {(ticket.platform === "website" && ticket.paymentMethod === "online") || ticket.status === "paid" ? (
+                                            {(ticket.platform === "website" && ticket.paymentMethod === "e-wallet") || ticket.status === "paid" ? (
                                                 // Website online payments or paid tickets are not editable
                                                 <div className="flex items-center gap-1">
                                                     {getStatusBadge(ticket.status)}
