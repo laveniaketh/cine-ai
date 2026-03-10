@@ -9,6 +9,7 @@ const ROUTE_AUDIO: Record<string, string> = {
     "/kiosk/movie-selection": process.env.NEXT_PUBLIC_AUDIO_MOVIE_SELECTION!,
     "/kiosk/seat-selection": process.env.NEXT_PUBLIC_AUDIO_SEAT_SELECTION!,
     "/kiosk/payment-confirmation": process.env.NEXT_PUBLIC_AUDIO_PAYMENT_CONFIRMATION!,
+    "/kiosk/payment-method": process.env.NEXT_PUBLIC_AUDIO_PAYMENT_METHOD!,
     "/kiosk/payment-sucessful": process.env.NEXT_PUBLIC_AUDIO_PAYMENT_SUCCESSFUL!,
 };
 
@@ -21,9 +22,15 @@ const ROUTE_MESSAGES: Record<string, string> = {
     "/kiosk/seat-selection":
         "Select your preferred seats for the movie. See through the seat legend to determine available, reserved, and sold seats. You can select up to 20 seats for your booking. Click on the seats you want, then press Next.",
     "/kiosk/payment-confirmation":
-        "Please review your payment details carefully. Check your movie title, timeslot, selected seats, and total amount. If everything is correct, click Confirm to proceed. Otherwise, click Back to modify your selection.",
+        "Review your payment details carefully. Check your movie title, timeslot, selected seats, and total amount. If everything is correct, click Confirm to proceed. Otherwise, click Back to modify your selection.",
+    "/kiosk/payment-method":
+        "Choose your payment method. You may pay at the counter to complete payment with the cashier, or use online payment to proceed with an e-wallet checkout.",
     "/kiosk/payment-sucessful":
-        "Booking successful! Your tickets have been reserved. Please proceed to the cashier counter to complete your payment and collect your physical tickets. Thank you for choosing CineAI!",
+        "Booking successful! If you chose to pay at the facilitator, please proceed there now to complete your payment and collect your tickets. If you already paid online, please proceed to the facilitator for payment confirmation and ticket release. Thank you for choosing CineAI!",
+};
+
+type AudioWithStopFlag = HTMLAudioElement & {
+    _stoppedIntentionally?: boolean;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -36,7 +43,7 @@ export default function VoiceAssistant() {
     const [subtitleText, setSubtitleText] = useState("");
 
     // ─── Refs ─────────────────────────────────────────────────────────────────
-    const currentAudio = useRef<HTMLAudioElement | null>(null);
+    const currentAudio = useRef<AudioWithStopFlag | null>(null);
     const repeatRef = useRef<NodeJS.Timeout | null>(null);
     const subtitleTimer = useRef<NodeJS.Timeout | null>(null);
     const lastRouteRef = useRef("");
@@ -48,6 +55,7 @@ export default function VoiceAssistant() {
     // Holds the route that was blocked by the browser's autoplay policy.
     // When the user taps anywhere on the page, we retry playing this route.
     const pendingRouteRef = useRef<string | null>(null);
+    const playNavAudioRef = useRef<(route: string) => void>(() => { });
 
     const isOnKiosk = pathname?.startsWith("/kiosk");
 
@@ -73,7 +81,7 @@ export default function VoiceAssistant() {
             // Flag as intentionally stopped BEFORE clearing src.
             // Without this, setting src="" triggers onerror on the old element,
             // producing a false "Audio file failed to load" error on navigation.
-            (currentAudio.current as any)._stoppedIntentionally = true;
+            currentAudio.current._stoppedIntentionally = true;
             currentAudio.current.pause();
             currentAudio.current.src = "";
             currentAudio.current = null;
@@ -95,7 +103,7 @@ export default function VoiceAssistant() {
         // Stop whatever is currently playing before starting the new clip
         stopNavAudio();
 
-        const audio = new Audio(src);
+        const audio = new Audio(src) as AudioWithStopFlag;
         currentAudio.current = audio;
 
         audio.onended = () => {
@@ -107,7 +115,7 @@ export default function VoiceAssistant() {
             // Replay after 60s if still on the same route and not muted
             repeatRef.current = setTimeout(() => {
                 if (!isMutedRef.current && pathnameRef.current === route) {
-                    playNavAudio(route);
+                    playNavAudioRef.current(route);
                 }
             }, 15000);
         };
@@ -115,7 +123,7 @@ export default function VoiceAssistant() {
         audio.onerror = () => {
             // Ignore errors caused by intentional stops (navigation, mute, or
             // a new clip replacing this one). Only log genuine load failures.
-            if ((audio as any)._stoppedIntentionally) return;
+            if (audio._stoppedIntentionally) return;
             console.error(`[CineAI] Audio file failed to load: ${src}`);
             setIsSpeaking(false);
             hideMessage();
@@ -145,6 +153,10 @@ export default function VoiceAssistant() {
 
     }, [showMessage, hideMessage, stopNavAudio]);
 
+    useEffect(() => {
+        playNavAudioRef.current = playNavAudio;
+    }, [playNavAudio]);
+
     // ── Retry blocked audio on first user interaction with the page ───────────
     // Attaches a one-shot click/touchstart listener to the document.
     // As soon as the user taps or clicks anything, the pending audio plays.
@@ -172,13 +184,18 @@ export default function VoiceAssistant() {
         if (pathname === lastRouteRef.current) return;
         lastRouteRef.current = pathname || "";
 
-        stopNavAudio();
+        const stopTimer = setTimeout(() => stopNavAudio(), 0);
 
         if (!isMutedRef.current && ROUTE_AUDIO[pathname || ""]) {
             // Small delay so the page transition settles before audio starts
             const t = setTimeout(() => playNavAudio(pathname || ""), 400);
-            return () => clearTimeout(t);
+            return () => {
+                clearTimeout(stopTimer);
+                clearTimeout(t);
+            };
         }
+
+        return () => clearTimeout(stopTimer);
     }, [pathname, isOnKiosk, stopNavAudio, playNavAudio]);
 
     // ── Toggle mute / unmute ───────────────────────────────────────────────────
@@ -221,7 +238,7 @@ export default function VoiceAssistant() {
                     <div className="flex items-start gap-2">
 
                         {/* Animated voice bars — pulse while audio is playing */}
-                        <div className="flex-shrink-0 mt-1 flex gap-0.5 items-end h-4">
+                        <div className="shrink-0 mt-1 flex gap-0.5 items-end h-4">
                             {[0, 150, 300].map((delay) => (
                                 <div
                                     key={delay}

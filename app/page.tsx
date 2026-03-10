@@ -14,9 +14,6 @@ const Page = () => {
 
             </div>
 
-
-
-
         </div >
     )
 }

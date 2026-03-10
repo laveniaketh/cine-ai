@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
     // Sanitize all string inputs to prevent NoSQL injection
     const movieTitle = sanitizeString(body.movieTitle);
     const paymentStatus = sanitizeString(body.paymentStatus);
+    const paymentMethod = sanitizeString(body.paymentMethod);
     const platform = sanitizeString(body.platform);
     const dayOfWeek = sanitizeString(body.dayOfWeek);
     const weekNumber = sanitizeString(body.weekNumber);
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
       !seatsSelected ||
       !paymentAmount ||
       !paymentStatus ||
+      !paymentMethod ||
       !platform ||
       !dayOfWeek ||
       !weekNumber
@@ -60,6 +62,15 @@ export async function POST(req: NextRequest) {
     if (!validStatuses.includes(paymentStatus.toLowerCase())) {
       return NextResponse.json(
         { message: "paymentStatus must be paid, pending, or cancelled" },
+        { status: 400 },
+      );
+    }
+
+    // Validate payment method
+    const validPaymentMethods = ["cash", "e-wallet"];
+    if (!validPaymentMethods.includes(paymentMethod.toLowerCase())) {
+      return NextResponse.json(
+        { message: "paymentMethod must be cash or e-wallet" },
         { status: 400 },
       );
     }
@@ -126,6 +137,7 @@ export async function POST(req: NextRequest) {
       movie_id: movie._id,
       paymentAmount: paymentAmount,
       paymentStatus: paymentStatus.toLowerCase(),
+      paymentMethod: paymentMethod.toLowerCase(),
     });
 
     // Create reserved seats
@@ -153,6 +165,7 @@ export async function POST(req: NextRequest) {
           payment: {
             paymentAmount: payment.paymentAmount,
             paymentStatus: payment.paymentStatus,
+            paymentMethod: payment.paymentMethod,
           },
           reservedSeats: reservedSeatsRecords.map((seat) => seat.seatNumber),
         },
@@ -198,6 +211,7 @@ export async function GET() {
             ? {
                 paymentAmount: payment.paymentAmount,
                 paymentStatus: payment.paymentStatus,
+                paymentMethod: payment.paymentMethod,
               }
             : null,
           reservedSeats: reservedSeats.map((seat) => seat.seatNumber),

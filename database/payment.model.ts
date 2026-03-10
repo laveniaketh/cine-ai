@@ -6,6 +6,10 @@ export interface IPayment extends Document {
   movie_id: Types.ObjectId;
   paymentAmount: number;
   paymentStatus: string;
+  paymentMethod: "cash" | "e-wallet";
+  paymongoCheckoutSessionId?: string;
+  paymongoCheckoutUrl?: string;
+  paymongoPaymentId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,10 +42,36 @@ const PaymentSchema = new Schema<IPayment>(
       },
       default: "pending",
     },
+    paymentMethod: {
+      type: String,
+      required: [true, "Payment method is required"],
+      trim: true,
+      lowercase: true,
+      enum: {
+        values: ["cash", "e-wallet"],
+        message: "Payment method must be cash or e-wallet",
+      },
+      default: "cash",
+    },
+    paymongoCheckoutSessionId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    paymongoCheckoutUrl: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    paymongoPaymentId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
   },
   {
     timestamps: true, // Auto-generate createdAt and updatedAt
-  }
+  },
 );
 
 // Create index on ticket_id for foreign key queries
@@ -55,6 +85,12 @@ PaymentSchema.index({ ticket_id: 1, paymentStatus: 1 });
 
 // Create index on paymentStatus for filtering
 PaymentSchema.index({ paymentStatus: 1 });
+
+// Create index on paymentMethod for reporting and filtering
+PaymentSchema.index({ paymentMethod: 1 });
+
+// Create index for PayMongo checkout session lookups
+PaymentSchema.index({ paymongoCheckoutSessionId: 1 });
 
 const Payment = models.Payment || model<IPayment>("Payment", PaymentSchema);
 

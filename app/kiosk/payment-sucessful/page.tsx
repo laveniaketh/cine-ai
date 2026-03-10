@@ -35,4 +35,4 @@ const PaymentSuccessful = () => {
     );
 };
 
-export default PaymentSuccessful;
+export default PaymentSuccessful;   
