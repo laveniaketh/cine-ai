@@ -25,7 +25,7 @@ const Countdown: React.FC = () => {
         <div className="flex flex-col items-center justify-center w-full mt-6">
             {finished ? (
                 <p className="text-lg font-medium text-white max-w-xl text-center px-4">
-                    Proceed to facilitator for payment. Thank you and come again!
+                    Proceed to the facilitator. Thank you and come again!
                 </p>
             ) : (
                 <>

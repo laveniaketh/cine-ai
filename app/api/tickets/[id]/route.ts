@@ -49,6 +49,7 @@ export async function GET(
             ? {
                 paymentAmount: payment.paymentAmount,
                 paymentStatus: payment.paymentStatus,
+                paymentMethod: payment.paymentMethod,
               }
             : null,
           reservedSeats: reservedSeats.map((seat) => seat.seatNumber),
@@ -138,6 +139,7 @@ export async function PATCH(
           ticket_id: ticketId,
           paymentAmount: updatedPayment.paymentAmount,
           paymentStatus: updatedPayment.paymentStatus,
+          paymentMethod: updatedPayment.paymentMethod,
           updatedAt: updatedPayment.updatedAt,
         },
       },

@@ -34,48 +34,11 @@ const PaymentConfirmation = () => {
             if (!selectedMovie || !selectedSeats || selectedSeats.length === 0) {
                 throw new Error('Missing movie or seat selection');
             }
-
-            const seatPrice = 200;
-            const paymentAmount = selectedSeats.length * seatPrice;
-
-            // Calculate current day of week and week number
-            const now = new Date();
-            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-            const currentDayOfWeek = days[now.getDay()];
-            const dayOfMonth = now.getDate();
-            const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
-
-            // Prepare the request body
-            const requestBody = {
-                movieTitle: selectedMovie.movieTitle,
-                seatsSelected: selectedSeats,
-                paymentAmount: paymentAmount,
-                paymentStatus: 'pending',
-                platform: 'kiosk',
-                dayOfWeek: currentDayOfWeek,
-                weekNumber: currentWeekNumber,
-            };
-
-            // Send POST request
-            const response = await fetch('/api/tickets', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestBody),
-            });
-
-            const data = await response.json();
-
-            // Handle error responses
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to process your purchase. Please try again.');
-            }
             setIsDialogOpen(false);
-            router.push('/kiosk/payment-sucessful');
+            router.push('/kiosk/payment-method');
         } catch (err) {
             console.error('Purchase error:', err);
-            setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
+            setError(err instanceof Error ? err.message : 'Unable to continue to payment method. Please try again.');
 
             // Auto-dismiss error after 5 seconds
             setTimeout(() => {
@@ -266,7 +229,7 @@ const PaymentConfirmation = () => {
                                     Processing...
                                 </>
                             ) : (
-                                'Confirm'
+                                'Continue'
                             )}
                         </Button>
                     </DialogFooter>
