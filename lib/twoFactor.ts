@@ -8,7 +8,13 @@ export function generateTwoFactorCode(): string {
 }
 
 function normalizePhilippineNumber(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+  const rawPhone = phone.trim();
+  const digits = rawPhone.replace(/\D/g, "");
+
+  // 9XXXXXXXXX -> +639XXXXXXXXX
+  if (/^9\d{9}$/.test(digits)) {
+    return `+63${digits}`;
+  }
 
   // 09XXXXXXXXX -> +639XXXXXXXXX
   if (/^09\d{9}$/.test(digits)) {
@@ -21,17 +27,18 @@ function normalizePhilippineNumber(phone: string): string {
   }
 
   // +639XXXXXXXXX -> +639XXXXXXXXX
-  if (/^\+639\d{9}$/.test(phone)) {
-    return phone;
+  if (/^\+639\d{9}$/.test(rawPhone)) {
+    return rawPhone;
   }
 
   throw new Error("Invalid Philippine mobile number format");
 }
 
 function getSmsApiConfig() {
-  const apiKey = process.env.SMS_API_PH_API_KEY;
-  const baseUrl =
-    process.env.SMS_API_PH_BASE_URL || "https://smsapiph.onrender.com/api/v1";
+  const apiKey = process.env.SMS_API_PH_API_KEY?.trim();
+  const baseOrEndpoint =
+    process.env.SMS_API_PH_BASE_URL?.trim() ||
+    "https://smsapiph.onrender.com/api/v1";
 
   if (!apiKey) {
     throw new Error(
@@ -39,7 +46,12 @@ function getSmsApiConfig() {
     );
   }
 
-  return { apiKey, baseUrl: baseUrl.replace(/\/$/, "") };
+  const normalized = baseOrEndpoint.replace(/\/$/, "");
+  const endpoint = /\/send\/sms$/i.test(normalized)
+    ? normalized
+    : `${normalized}/send/sms`;
+
+  return { apiKey, endpoint };
 }
 
 /**
@@ -58,10 +70,9 @@ export async function sendVerificationCode(
 
   const normalizedPhone = normalizePhilippineNumber(phone);
   const localPhone = `0${normalizedPhone.slice(3)}`;
-  const { apiKey, baseUrl } = getSmsApiConfig();
+  const { apiKey, endpoint } = getSmsApiConfig();
   const message = `Your CineAI verification code is ${code}. It expires in 5 minutes.`;
 
-  const endpoint = `${baseUrl}/send/sms`;
   const recipientCandidates = [normalizedPhone, localPhone];
   let lastError = "Unknown SMS API error";
 
@@ -110,7 +121,11 @@ export async function sendVerificationCode(
           payload,
           responseJson,
         });
-        lastError = String(responseJson.message || responseJson.error || "Provider reported failure");
+        lastError = String(
+          responseJson.message ||
+            responseJson.error ||
+            "Provider reported failure",
+        );
         continue;
       }
 
@@ -134,5 +149,7 @@ export async function sendVerificationCode(
     }
   }
 
-  throw new Error(`Failed to send verification code via SMS API PH. ${lastError}`);
+  throw new Error(
+    `Failed to send verification code via SMS API PH. ${lastError}`,
+  );
 }

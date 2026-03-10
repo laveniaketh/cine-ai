@@ -37,18 +37,17 @@ const TwoFactorMethodForm = ({ maskedPhoneNumber }: TwoFactorMethodFormProps) =>
             <button
               type="button"
               onClick={() => setMethod("sms")}
-              className={`w-full rounded-md border px-4 py-3 text-left transition ${
-                method === "sms"
+              className={`w-full rounded-md border px-4 py-3 text-left transition ${method === "sms"
                   ? "border-white bg-neutral-700 text-white"
                   : "border-neutral-600 bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
-              }`}
+                }`}
               disabled={pending}
             >
               <p className="font-medium">Receive via SMS</p>
               <p className="text-xs text-neutral-400">Text message to {maskedPhoneNumber}</p>
             </button>
 
-            <button
+            {/* <button
               type="button"
               onClick={() => setMethod("call")}
               className={`w-full rounded-md border px-4 py-3 text-left transition ${
@@ -60,7 +59,7 @@ const TwoFactorMethodForm = ({ maskedPhoneNumber }: TwoFactorMethodFormProps) =>
             >
               <p className="font-medium">Receive via Phone Call</p>
               <p className="text-xs text-neutral-400">Automated call to {maskedPhoneNumber}</p>
-            </button>
+            </button> */}
 
             <p className="text-sm text-gray-500 mt-4">
               If you do not have access to the phone associated with {maskedPhoneNumber}, please contact your admin.
