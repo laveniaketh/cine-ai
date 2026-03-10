@@ -1,27 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Payment from "@/database/payment.model";
-import Ticket from "@/database/ticket.model";
 
-export async function GET(req: NextRequest) {
+type SalesPoint = {
+  label: string;
+  tickets: number;
+  revenue: number;
+};
+
+type AIPrediction = {
+  nextWeekTickets: number;
+  nextWeekRevenue: number;
+  growthRate: number;
+  performanceLevel: string;
+  insight: string;
+  confidence: number;
+  trendDirection: "increasing" | "decreasing" | "stable";
+  avgTicketPrice?: number;
+};
+
+export async function GET() {
   try {
     await connectDB();
 
     // Get current day of week and week number
     const now = new Date();
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const currentDayOfWeek = days[now.getDay()];
     const dayOfMonth = now.getDate();
     const currentWeekNumber = `Week ${Math.ceil(dayOfMonth / 7)}`;
 
-    // Process daily data (current day of week for this week)
-    const dailyData = await processDailyData(
-      currentDayOfWeek,
-      currentWeekNumber
-    );
+    // Process daily data for current week.
+    const dailyData = await processDailyData(currentWeekNumber);
 
-    // Process weekly data (current week number across different months)
-    const weeklyData = await processWeeklyData(currentWeekNumber);
+    // Process weekly data for current month.
+    const weeklyData = await processWeeklyData();
 
     // Generate AI predictions
     const aiPrediction = generateAIPrediction(dailyData, weeklyData);
@@ -61,23 +72,46 @@ export async function GET(req: NextRequest) {
         message: "Failed to fetch sales analytics",
         error: e instanceof Error ? e.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 async function processDailyData(
-  currentDayOfWeek: string,
-  currentWeekNumber: string
-) {
+  currentWeekNumber: string,
+): Promise<SalesPoint[]> {
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  // Find all tickets for current week with their day of week
-  const tickets = await Ticket.find({
-    weekNumber: currentWeekNumber,
-  }).populate("movie_id");
+  // Aggregate paid payments by ticket day-of-week for current week.
+  const aggregated = (await Payment.aggregate([
+    {
+      $match: {
+        paymentStatus: "paid",
+      },
+    },
+    {
+      $lookup: {
+        from: "tickets",
+        localField: "ticket_id",
+        foreignField: "_id",
+        as: "ticket",
+      },
+    },
+    { $unwind: "$ticket" },
+    {
+      $match: {
+        "ticket.weekNumber": currentWeekNumber,
+      },
+    },
+    {
+      $group: {
+        _id: "$ticket.dayOfWeek",
+        tickets: { $sum: 1 },
+        revenue: { $sum: "$paymentAmount" },
+      },
+    },
+  ])) as Array<{ _id: string; tickets: number; revenue: number }>;
 
-  // Group by day of week
   const dailyMap = new Map<string, { tickets: number; revenue: number }>();
 
   // Initialize all days
@@ -85,20 +119,11 @@ async function processDailyData(
     dailyMap.set(day, { tickets: 0, revenue: 0 });
   });
 
-  // Process each ticket
-  for (const ticket of tickets) {
-    const payment = await Payment.findOne({
-      ticket_id: ticket._id,
-      paymentStatus: "paid",
-    });
-
-    if (payment && ticket.dayOfWeek) {
-      const current = dailyMap.get(ticket.dayOfWeek)!;
-      dailyMap.set(ticket.dayOfWeek, {
-        tickets: current.tickets + 1,
-        revenue: current.revenue + payment.paymentAmount,
-      });
+  for (const row of aggregated) {
+    if (!row._id || !dailyMap.has(row._id)) {
+      continue;
     }
+    dailyMap.set(row._id, { tickets: row.tickets, revenue: row.revenue });
   }
 
   // Convert to array in day order
@@ -109,54 +134,68 @@ async function processDailyData(
   }));
 }
 
-async function processWeeklyData(currentWeekNumber: string) {
+async function processWeeklyData(): Promise<SalesPoint[]> {
   // Get tickets for all weeks in the current month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const weeklyData: Array<{ label: string; tickets: number; revenue: number }> =
-    [];
+  const weekLabels = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"];
 
-  // Process each week (Week 1, Week 2, Week 3, Week 4)
-  for (let weekNum = 1; weekNum <= 4; weekNum++) {
-    const weekLabel = `Week ${weekNum}`;
-
-    // Find tickets for this specific week in current month
-    const tickets = await Ticket.find({
-      weekNumber: weekLabel,
-      createdAt: {
-        $gte: startOfMonth,
-        $lte: endOfMonth,
-      },
-    });
-
-    let totalTickets = 0;
-    let totalRevenue = 0;
-
-    for (const ticket of tickets) {
-      const payment = await Payment.findOne({
-        ticket_id: ticket._id,
+  const aggregated = (await Payment.aggregate([
+    {
+      $match: {
         paymentStatus: "paid",
-      });
+      },
+    },
+    {
+      $lookup: {
+        from: "tickets",
+        localField: "ticket_id",
+        foreignField: "_id",
+        as: "ticket",
+      },
+    },
+    { $unwind: "$ticket" },
+    {
+      $match: {
+        "ticket.createdAt": {
+          $gte: startOfMonth,
+          $lte: endOfMonth,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: "$ticket.weekNumber",
+        tickets: { $sum: 1 },
+        revenue: { $sum: "$paymentAmount" },
+      },
+    },
+  ])) as Array<{ _id: string; tickets: number; revenue: number }>;
 
-      if (payment) {
-        totalTickets++;
-        totalRevenue += payment.paymentAmount;
-      }
+  const weeklyMap = new Map<string, { tickets: number; revenue: number }>();
+  for (const row of aggregated) {
+    if (!row._id || !weekLabels.includes(row._id)) {
+      continue;
     }
-
-    weeklyData.push({
-      label: weekLabel,
-      tickets: totalTickets,
-      revenue: totalRevenue,
-    });
+    weeklyMap.set(row._id, { tickets: row.tickets, revenue: row.revenue });
   }
 
-  return weeklyData;
+  return weekLabels.map((label) => {
+    const point = weeklyMap.get(label) || { tickets: 0, revenue: 0 };
+    return {
+      label,
+      tickets: point.tickets,
+      revenue: point.revenue,
+    };
+  });
 }
 
-function generateAIPrediction(dailyData: any[], weeklyData: any[]) {
+function generateAIPrediction(
+  dailyData: SalesPoint[],
+  weeklyData: SalesPoint[],
+): AIPrediction {
   // Enhanced AI prediction with multiple factors
   const weeklyTickets = weeklyData.map((w) => w.tickets);
   const weeklyRevenue = weeklyData.map((w) => w.revenue);
@@ -177,8 +216,6 @@ function generateAIPrediction(dailyData: any[], weeklyData: any[]) {
 
   // Filter out zero weeks for better prediction on sparse data
   const nonZeroWeeks = weeklyTickets.filter((t) => t > 0);
-  const nonZeroRevenue = weeklyRevenue.filter((r) => r > 0);
-
   // Calculate averages (use all data for context)
   const avgTickets =
     weeklyTickets.reduce((sum, val) => sum + val, 0) / weeklyTickets.length;
@@ -228,12 +265,12 @@ function generateAIPrediction(dailyData: any[], weeklyData: any[]) {
 
   // Weighted prediction: 40% linear regression, 30% growth, 30% average
   const predictedTicketsGrowth = Math.round(
-    lastNonZeroWeek * (1 + growthRate * 0.7)
+    lastNonZeroWeek * (1 + growthRate * 0.7),
   );
   const predictedTickets = Math.round(
     predictedTicketsLinear * 0.4 +
       predictedTicketsGrowth * 0.3 +
-      avgNonZeroTickets * 0.3
+      avgNonZeroTickets * 0.3,
   );
 
   // Revenue prediction with correlation analysis
@@ -248,7 +285,7 @@ function generateAIPrediction(dailyData: any[], weeklyData: any[]) {
   const coefficientOfVariation = avgTickets !== 0 ? stdDev / avgTickets : 1;
   const confidence = Math.max(
     0,
-    Math.min(100, Math.round((1 - coefficientOfVariation) * 100))
+    Math.min(100, Math.round((1 - coefficientOfVariation) * 100)),
   );
 
   // Determine trend direction
@@ -267,22 +304,22 @@ function generateAIPrediction(dailyData: any[], weeklyData: any[]) {
   if (dailyAvg >= 250) {
     performanceLevel = "strong";
     insight = `Excellent performance! ${Math.round(
-      dailyAvg
+      dailyAvg,
     )} tickets/day average with ${trendDirection} trend.`;
   } else if (dailyAvg >= 150) {
     performanceLevel = "stable";
     insight = `Stable performance at ${Math.round(
-      dailyAvg
+      dailyAvg,
     )} tickets/day with ${trendDirection} trend.`;
   } else if (dailyAvg >= 50) {
     performanceLevel = "moderate";
     insight = `Moderate performance at ${Math.round(
-      dailyAvg
+      dailyAvg,
     )} tickets/day. Consider promotional campaigns.`;
   } else {
     performanceLevel = "below_target";
     insight = `Below target at ${Math.round(
-      dailyAvg
+      dailyAvg,
     )} tickets/day. Urgent action needed.`;
   }
 
